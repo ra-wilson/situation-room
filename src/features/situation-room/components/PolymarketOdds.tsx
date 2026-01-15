@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { situationService } from '../services/situationService';
 import type { PredictionMarket } from '../domain/types';
 
 export default function PolymarketOdds() {
@@ -16,7 +15,11 @@ export default function PolymarketOdds() {
   const fetchOdds = async () => {
     setIsLoading(true);
     try {
-      const data = await situationService.getPredictionMarkets();
+      const res = await fetch("/api/polymarket");
+      if (!res.ok) {
+        throw new Error("Failed to load polymarket");
+      }
+      const data = (await res.json()) as PredictionMarket[];
       setOdds(data);
     } catch (error) {
       console.error('Failed to fetch odds:', error);
