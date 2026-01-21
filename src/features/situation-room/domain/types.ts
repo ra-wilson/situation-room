@@ -52,6 +52,7 @@ export type PredictionMarket = {
   trend: "up" | "down" | "stable";
   category: string;
   timeframe?: string;
+  slug?: string;
   url?: string;
 };
 

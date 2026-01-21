@@ -1,0 +1,18 @@
+export const GEO_SEED_TERMS = [
+  "ceasefire",
+  "sanctions",
+  "regime",
+  "election",
+  "invasion",
+  "missile",
+  "nuclear",
+  "taiwan",
+  "ukraine",
+  "russia",
+  "iran",
+  "china",
+  "israel",
+  "gaza",
+  "middle east",
+  "greenland",
+];

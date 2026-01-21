@@ -32,19 +32,23 @@ export default function StatusBar({ user, onLogout, onShowAlerts }: StatusBarPro
   return (
     <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a] to-transparent">
       <div className="border-b border-cyan-900/30 bg-[#0a0a0a]/90 backdrop-blur-sm">
-        <div className="flex items-center justify-between px-6 py-3">
+        <div className="flex items-center justify-between px-3 py-3 sm:px-6">
           {/* Left - Title */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <Shield className="w-5 h-5 text-cyan-400" />
-              <span className="text-cyan-400 font-bold tracking-wider text-lg">SITUATION MONITOR</span>
+              <span className="text-cyan-400 font-bold tracking-wider text-lg truncate">
+                SITUATION MONITOR
+              </span>
             </div>
-            <div className="h-4 w-px bg-cyan-900/50" />
-            <span className="text-[10px] text-cyan-600 tracking-widest">GEOPOLITICAL INTELLIGENCE SYSTEM</span>
+            <div className="hidden md:block h-4 w-px bg-cyan-900/50" />
+            <span className="hidden md:inline text-[10px] text-cyan-600 tracking-widest">
+              GEOPOLITICAL INTELLIGENCE SYSTEM
+            </span>
           </div>
 
           {/* Center - Status Indicators */}
-          <div className="flex items-center gap-6">
+          <div className="hidden xl:flex items-center gap-6">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-[10px] text-green-400 tracking-wider">SYSTEMS NOMINAL</span>
@@ -101,7 +105,7 @@ export default function StatusBar({ user, onLogout, onShowAlerts }: StatusBarPro
             </DropdownMenu>
 
             {/* Time */}
-            <div className="text-right">
+            <div className="hidden lg:block text-right">
               <div className="text-cyan-300 text-sm font-bold tracking-wider">
                 {formatTime(time)}
               </div>

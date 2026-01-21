@@ -12,6 +12,11 @@ export type Market = {
   category?: string;
   outcomes?: string | string[];
   outcomePrices?: string | Array<string | number>;
+  active?: boolean;
+  closed?: boolean;
+  liquidityNum?: number | null;
+  volumeNum?: number | null;
+  volume24hr?: number | null;
   oneHourPriceChange?: number | null;
   oneDayPriceChange?: number | null;
 };
@@ -20,6 +25,7 @@ export type Event = {
   id: string;
   slug?: string;
   title?: string;
+  seriesSlug?: string;
   category?: string;
   markets?: Market[];
   tags?: Tag[];
