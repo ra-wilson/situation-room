@@ -19,11 +19,57 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
     fetchNews();
   }, []);
 
+  const toNumber = (value: unknown): number | null => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+  };
+
+  const normalizeNewsItem = (item: unknown, index: number): NewsItem => {
+    const raw = item as Record<string, unknown>;
+    const lat = toNumber(raw.lat ?? raw.latitude);
+    const lng = toNumber(raw.lng ?? raw.longitude);
+
+    return {
+      id: typeof raw.id === 'string' ? raw.id : `news-${index}`,
+      headline:
+        typeof raw.headline === 'string'
+          ? raw.headline
+          : typeof raw.title === 'string'
+          ? raw.title
+          : 'Untitled',
+      summary: typeof raw.summary === 'string' ? raw.summary : '',
+      threat_level:
+        typeof raw.threat_level === 'string'
+          ? raw.threat_level
+          : typeof raw.threatLevel === 'string'
+          ? raw.threatLevel
+          : 'low',
+      region:
+        typeof raw.region === 'string'
+          ? raw.region
+          : typeof raw.regionName === 'string'
+          ? raw.regionName
+          : typeof raw.country === 'string'
+          ? raw.country
+          : 'Unknown',
+      country: typeof raw.country === 'string' ? raw.country : undefined,
+      lat: lat ?? 0,
+      lng: lng ?? 0,
+      category: typeof raw.category === 'string' ? raw.category : 'conflict',
+      timestamp: typeof raw.timestamp === 'string' ? raw.timestamp : undefined,
+    };
+  };
+
   const fetchNews = async () => {
     setIsLoading(true);
     try {
       const news = await situationService.getNews();
-      setNewsData(news);
+      const normalized = news.map((item, index) => normalizeNewsItem(item, index));
+      setNewsData(normalized);
     } catch (error) {
       console.error('Failed to fetch news:', error);
     } finally {

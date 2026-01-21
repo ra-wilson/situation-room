@@ -74,7 +74,7 @@ export default function SituationMonitor() {
       <QueryClientProvider client={queryClient}>
         <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center relative overflow-hidden">
           {/* Background grid */}
-          <div className="fixed inset-0 opacity-[0.02]"
+          <div className="pointer-events-none fixed inset-0 opacity-[0.02]"
                style={{
                  backgroundImage: 'linear-gradient(rgba(34,211,238,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.3) 1px, transparent 1px)',
                  backgroundSize: '50px 50px'
@@ -133,7 +133,7 @@ export default function SituationMonitor() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-[#0a0a0a] text-white font-mono overflow-hidden relative">
+      <div className="min-h-screen bg-[#0a0a0a] text-white font-mono relative overflow-y-auto xl:overflow-hidden">
         {/* Scan line effect overlay */}
         <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.03]" 
              style={{
@@ -142,7 +142,7 @@ export default function SituationMonitor() {
         />
         
         {/* Grid background */}
-        <div className="fixed inset-0 opacity-[0.02]"
+        <div className="pointer-events-none fixed inset-0 opacity-[0.02]"
              style={{
                backgroundImage: 'linear-gradient(rgba(34,211,238,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.3) 1px, transparent 1px)',
                backgroundSize: '50px 50px'
@@ -156,9 +156,9 @@ export default function SituationMonitor() {
         <MarketTickers />
 
         {/* Main Content */}
-        <div className="pt-24 pb-4 px-4 h-screen flex gap-4">
+        <div className="pt-24 pb-4 px-4 flex flex-col xl:flex-row gap-4 xl:h-screen">
           {/* Left Panel - News Feed */}
-          <div className="w-80 flex-shrink-0">
+          <div className="w-full xl:w-80 flex-shrink-0">
             <NewsFeed 
               onSelectNews={setSelectedNews} 
               newsData={newsData}
@@ -169,7 +169,7 @@ export default function SituationMonitor() {
           </div>
 
           {/* Center - Globe */}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-h-[360px] xl:min-h-0">
             <GlobeMap 
               newsData={newsData} 
               onSelectNews={setSelectedNews}
@@ -177,7 +177,7 @@ export default function SituationMonitor() {
           </div>
 
           {/* Right Panel - Polymarket */}
-          <div className="w-80 flex-shrink-0">
+          <div className="w-full xl:w-80 flex-shrink-0">
             <PolymarketOdds />
           </div>
         </div>

@@ -25,7 +25,8 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const globeRef = useRef<THREE.Mesh | null>(null);
+  const globeRef = useRef<THREE.Object3D | null>(null);
+  const depthGlobeRef = useRef<THREE.Mesh | null>(null);
   const markersRef = useRef<THREE.Object3D[]>([]);
   const [isGlobeReady, setIsGlobeReady] = useState(false);
   const [isLoadingBorders, setIsLoadingBorders] = useState(true);
@@ -33,6 +34,9 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
   const previousMousePosition = useRef({ x: 0, y: 0 });
   const targetRotation = useRef({ x: 0, y: 0 });
   const currentRotation = useRef({ x: 0, y: 0 });
+  const minZoomDistance = 2.8;
+  const maxZoomDistance = 10;
+  const defaultZoomDistance = 3.2;
 
   const latLngToVector3 = (lat: number, lng: number, radius = 1.001) => {
     const phi = (90 - lat) * (Math.PI / 180);
@@ -98,196 +102,261 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
   useEffect(() => {
     if (!containerRef.current) return;
     const containerEl = containerRef.current;
+    let teardown: (() => void) | null = null;
+    let initObserver: ResizeObserver | null = null;
 
-    // Scene setup
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
+    const initGlobe = (rect: DOMRect) => {
+      console.log('[GlobeMap] init size', rect.width, rect.height);
 
-    // Camera
-    const camera = new THREE.PerspectiveCamera(45, containerRef.current.clientWidth / containerRef.current.clientHeight, 0.1, 1000);
-    camera.position.z = 3;
-    cameraRef.current = camera;
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    containerRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    // Globe
-    const globeGeometry = new THREE.SphereGeometry(1, 64, 64);
-    
-    const globeMaterial = new THREE.MeshPhongMaterial({
-      color: 0x050a05,
-      emissive: 0x051005,
-      specular: 0x22d3ee,
-      shininess: 5,
-      transparent: true,
-      opacity: 0.95,
-    });
-
-    const globe = new THREE.Mesh(globeGeometry, globeMaterial);
-    scene.add(globe);
-    globeRef.current = globe;
-    setIsGlobeReady(true);
-
-    // Load country borders
-    drawCountryBorders(globe);
-
-    // Grid lines on globe (subtle lat/lng)
-    const gridMaterial = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.08 });
-    
-    // Latitude lines
-    for (let i = -60; i <= 60; i += 30) {
-      const latRad = (i * Math.PI) / 180;
-      const radius = Math.cos(latRad);
-      const y = Math.sin(latRad);
-      const points = [];
-      for (let j = 0; j <= 360; j += 5) {
-        const lngRad = (j * Math.PI) / 180;
-        points.push(new THREE.Vector3(
-          radius * Math.cos(lngRad) * 1.002,
-          y * 1.002,
-          radius * Math.sin(lngRad) * 1.002
-        ));
+      while (containerEl.firstChild) {
+        containerEl.removeChild(containerEl.firstChild);
       }
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const line = new THREE.Line(geometry, gridMaterial);
-      globe.add(line);
-    }
 
-    // Longitude lines
-    for (let i = 0; i < 360; i += 30) {
-      const lngRad = (i * Math.PI) / 180;
-      const points = [];
-      for (let j = -90; j <= 90; j += 5) {
-        const latRad = (j * Math.PI) / 180;
-        const radius = Math.cos(latRad);
-        points.push(new THREE.Vector3(
-          radius * Math.cos(lngRad) * 1.002,
-          Math.sin(latRad) * 1.002,
-          radius * Math.sin(lngRad) * 1.002
-        ));
-      }
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      const line = new THREE.Line(geometry, gridMaterial);
-      globe.add(line);
-    }
+      // Scene setup
+      const scene = new THREE.Scene();
+      sceneRef.current = scene;
 
-    // Atmosphere glow
-    const atmosphereGeometry = new THREE.SphereGeometry(1.1, 64, 64);
-    const atmosphereMaterial = new THREE.ShaderMaterial({
-      vertexShader: `
-        varying vec3 vNormal;
-        void main() {
-          vNormal = normalize(normalMatrix * normal);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying vec3 vNormal;
-        void main() {
-          float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
-          gl_FragColor = vec4(0.13, 0.83, 0.93, 1.0) * intensity * 0.4;
-        }
-      `,
-      blending: THREE.AdditiveBlending,
-      side: THREE.BackSide,
-      transparent: true,
-    });
-    const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
-    scene.add(atmosphere);
+      // Camera
+      const camera = new THREE.PerspectiveCamera(45, rect.width / rect.height, 0.1, 1000);
+      camera.position.z = defaultZoomDistance;
+      camera.lookAt(0, 0, 0);
+      cameraRef.current = camera;
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-    scene.add(ambientLight);
+      // Renderer
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(rect.width, rect.height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.domElement.style.pointerEvents = 'auto';
+      renderer.domElement.style.touchAction = 'none';
+      containerEl.appendChild(renderer.domElement);
+      rendererRef.current = renderer;
 
-    const directionalLight = new THREE.DirectionalLight(0x22d3ee, 0.8);
-    directionalLight.position.set(5, 3, 5);
-    scene.add(directionalLight);
-
-    const backLight = new THREE.DirectionalLight(0x1a3a1a, 0.3);
-    backLight.position.set(-5, -3, -5);
-    scene.add(backLight);
-
-    // Animation loop
-    const animate = () => {
-      requestAnimationFrame(animate);
+      // Globe
+      const globeGeometry = new THREE.SphereGeometry(1, 64, 64);
+      const depthMaterial = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        depthWrite: true,
+        depthTest: true,
+        colorWrite: false,
+      });
+      const depthGlobe = new THREE.Mesh(globeGeometry, depthMaterial);
+      depthGlobe.renderOrder = 0;
+      scene.add(depthGlobe);
+      depthGlobeRef.current = depthGlobe;
       
-      currentRotation.current.x += (targetRotation.current.x - currentRotation.current.x) * 0.05;
-      currentRotation.current.y += (targetRotation.current.y - currentRotation.current.y) * 0.05;
-      
-      globe.rotation.x = currentRotation.current.x;
-      globe.rotation.y = currentRotation.current.y;
-
-      if (!isDragging.current) {
-        targetRotation.current.y += 0.001;
-      }
-
-      markersRef.current.forEach(marker => {
-        marker.lookAt(camera.position);
+      const globeMaterial = new THREE.MeshPhongMaterial({
+        color: 0x050a05,
+        emissive: 0x051005,
+        specular: 0x22d3ee,
+        shininess: 5,
+        transparent: true,
+        opacity: 0.95,
       });
 
-      renderer.render(scene, camera);
-    };
-    animate();
+      const globe = new THREE.Mesh(globeGeometry, globeMaterial);
+      globe.renderOrder = 1;
+      scene.add(globe);
+      globeRef.current = globe;
+      setIsGlobeReady(true);
 
-    // Handle resize
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      camera.aspect = containerRef.current.clientWidth / containerRef.current.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    };
-    window.addEventListener('resize', handleResize);
+      // Load country borders
+      drawCountryBorders(globe);
 
-    // Mouse events for rotation
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      isDragging.current = true;
-      previousMousePosition.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current) return;
+      // Grid lines on globe (subtle lat/lng)
+      const gridMaterial = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.08 });
       
-      const deltaX = e.clientX - previousMousePosition.current.x;
-      const deltaY = e.clientY - previousMousePosition.current.y;
-      
-      targetRotation.current.y += deltaX * 0.005;
-      targetRotation.current.x += deltaY * 0.005;
-      targetRotation.current.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetRotation.current.x));
-      
-      previousMousePosition.current = { x: e.clientX, y: e.clientY };
+      // Latitude lines
+      for (let i = -60; i <= 60; i += 30) {
+        const latRad = (i * Math.PI) / 180;
+        const radius = Math.cos(latRad);
+        const y = Math.sin(latRad);
+        const points = [];
+        for (let j = 0; j <= 360; j += 5) {
+          const lngRad = (j * Math.PI) / 180;
+          points.push(new THREE.Vector3(
+            radius * Math.cos(lngRad) * 1.002,
+            y * 1.002,
+            radius * Math.sin(lngRad) * 1.002
+          ));
+        }
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const line = new THREE.Line(geometry, gridMaterial);
+        globe.add(line);
+      }
+
+      // Longitude lines
+      for (let i = 0; i < 360; i += 30) {
+        const lngRad = (i * Math.PI) / 180;
+        const points = [];
+        for (let j = -90; j <= 90; j += 5) {
+          const latRad = (j * Math.PI) / 180;
+          const radius = Math.cos(latRad);
+          points.push(new THREE.Vector3(
+            radius * Math.cos(lngRad) * 1.002,
+            Math.sin(latRad) * 1.002,
+            radius * Math.sin(lngRad) * 1.002
+          ));
+        }
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const line = new THREE.Line(geometry, gridMaterial);
+        globe.add(line);
+      }
+
+      // Atmosphere glow
+      const atmosphereGeometry = new THREE.SphereGeometry(1.1, 64, 64);
+      const atmosphereMaterial = new THREE.ShaderMaterial({
+        vertexShader: `
+          varying vec3 vNormal;
+          void main() {
+            vNormal = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vNormal;
+          void main() {
+            float intensity = pow(0.65 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
+            gl_FragColor = vec4(0.13, 0.83, 0.93, 1.0) * intensity * 0.4;
+          }
+        `,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide,
+        transparent: true,
+        depthWrite: false,
+      });
+      const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+      atmosphere.renderOrder = 1;
+      scene.add(atmosphere);
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0x22d3ee, 0.8);
+      directionalLight.position.set(5, 3, 5);
+      scene.add(directionalLight);
+
+      const backLight = new THREE.DirectionalLight(0x1a3a1a, 0.3);
+      backLight.position.set(-5, -3, -5);
+      scene.add(backLight);
+
+      // Animation loop
+      const animate = () => {
+        requestAnimationFrame(animate);
+        
+        currentRotation.current.x += (targetRotation.current.x - currentRotation.current.x) * 0.05;
+        currentRotation.current.y += (targetRotation.current.y - currentRotation.current.y) * 0.05;
+        
+        globe.rotation.x = currentRotation.current.x;
+        globe.rotation.y = currentRotation.current.y;
+        if (depthGlobeRef.current) {
+          depthGlobeRef.current.rotation.x = currentRotation.current.x;
+          depthGlobeRef.current.rotation.y = currentRotation.current.y;
+        }
+
+        if (!isDragging.current) {
+          targetRotation.current.y += 0.001;
+        }
+
+        markersRef.current.forEach(marker => {
+          marker.lookAt(camera.position);
+        });
+
+        renderer.render(scene, camera);
+      };
+      animate();
+
+      // Handle resize
+      const handleResize = () => {
+        const nextRect = containerEl.getBoundingClientRect();
+        if (!nextRect.width || !nextRect.height) return;
+        camera.aspect = nextRect.width / nextRect.height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(nextRect.width, nextRect.height);
+      };
+      window.addEventListener('resize', handleResize);
+      const sizeObserver = new ResizeObserver(() => handleResize());
+      sizeObserver.observe(containerEl);
+
+      // Mouse events for rotation
+      const handlePointerDown = (e: PointerEvent) => {
+        if (e.button !== 0) return;
+        isDragging.current = true;
+        previousMousePosition.current = { x: e.clientX, y: e.clientY };
+      };
+
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging.current) return;
+        
+        const deltaX = e.clientX - previousMousePosition.current.x;
+        const deltaY = e.clientY - previousMousePosition.current.y;
+        
+        targetRotation.current.y += deltaX * 0.005;
+        targetRotation.current.x += deltaY * 0.005;
+        targetRotation.current.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetRotation.current.x));
+        
+        previousMousePosition.current = { x: e.clientX, y: e.clientY };
+      };
+
+      const handleMouseUp = () => {
+        isDragging.current = false;
+      };
+
+      const handleWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        if (!cameraRef.current) return;
+        const delta = e.deltaY;
+        const nextZoom = cameraRef.current.position.z + delta * 0.002;
+        cameraRef.current.position.z = Math.min(maxZoomDistance, Math.max(minZoomDistance, nextZoom));
+        cameraRef.current.lookAt(0, 0, 0);
+        console.log('[GlobeMap] wheel', delta, cameraRef.current.position.length());
+      };
+
+      const canvas = renderer.domElement;
+      canvas.addEventListener('pointerdown', handlePointerDown);
+      canvas.addEventListener('wheel', handleWheel, { passive: false });
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+
+      return () => {
+        window.removeEventListener('resize', handleResize);
+        sizeObserver.disconnect();
+        canvas.removeEventListener('pointerdown', handlePointerDown);
+        canvas.removeEventListener('wheel', handleWheel);
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        while (containerEl.firstChild) {
+          containerEl.removeChild(containerEl.firstChild);
+        }
+        renderer.dispose();
+      };
     };
 
-    const handleMouseUp = () => {
-      isDragging.current = false;
+    const tryInit = () => {
+      if (teardown) return;
+      const rect = containerEl.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      teardown = initGlobe(rect);
+      if (initObserver) {
+        initObserver.disconnect();
+        initObserver = null;
+      }
     };
 
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (!cameraRef.current) return;
-      const nextZoom = cameraRef.current.position.z + e.deltaY * 0.002;
-      cameraRef.current.position.z = Math.min(5, Math.max(1.5, nextZoom));
-    };
+    tryInit();
 
-    containerEl.addEventListener('mousedown', handleMouseDown);
-    containerEl.addEventListener('wheel', handleWheel, { passive: false });
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    if (!teardown) {
+      initObserver = new ResizeObserver(() => tryInit());
+      initObserver.observe(containerEl);
+    }
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      containerEl.removeEventListener('mousedown', handleMouseDown);
-      containerEl.removeEventListener('wheel', handleWheel);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement);
+      if (initObserver) {
+        initObserver.disconnect();
       }
-      renderer.dispose();
+      if (teardown) {
+        teardown();
+      }
     };
   }, []);
 
@@ -300,12 +369,16 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
     });
     markersRef.current = [];
 
+    let skipped = 0;
     newsData.forEach((news, index) => {
       const lat = Number(news.lat);
       const lng = Number(news.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        skipped += 1;
+        return;
+      }
 
-      const position = latLngToVector3(lat, lng, 1.02);
+      const position = latLngToVector3(lat, lng, 1.03);
 
       const markerGroup = new THREE.Group();
       markerGroup.position.copy(position);
@@ -324,25 +397,45 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
         color: markerColor, 
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.8
+        opacity: 0.8,
+        depthTest: true,
+        depthWrite: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
       });
       const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+      ring.renderOrder = 2;
       markerGroup.add(ring);
 
       // Center dot
       const dotGeometry = new THREE.CircleGeometry(0.018, 32);
       const dotMaterial = new THREE.MeshBasicMaterial({ 
         color: markerColor,
-        side: THREE.DoubleSide
+        side: THREE.DoubleSide,
+        depthTest: true,
+        depthWrite: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
       });
       const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+      dot.renderOrder = 2;
       markerGroup.add(dot);
 
       markerGroup.userData = { news, index };
 
+      markerGroup.renderOrder = 2;
       globeRef.current.add(markerGroup);
       markersRef.current.push(markerGroup);
     });
+
+    if (skipped > 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[GlobeMap] Skipped ${skipped} news items without valid lat/lng (total ${newsData.length}).`
+      );
+    }
   }, [isGlobeReady, newsData]);
 
   // Handle marker clicks
@@ -382,19 +475,22 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
 
   const handleZoomIn = () => {
     if (cameraRef.current) {
-      cameraRef.current.position.z = Math.max(1.5, cameraRef.current.position.z - 0.3);
+      cameraRef.current.position.z = Math.max(minZoomDistance, cameraRef.current.position.z - 0.3);
+      cameraRef.current.lookAt(0, 0, 0);
     }
   };
 
   const handleZoomOut = () => {
     if (cameraRef.current) {
-      cameraRef.current.position.z = Math.min(5, cameraRef.current.position.z + 0.3);
+      cameraRef.current.position.z = Math.min(maxZoomDistance, cameraRef.current.position.z + 0.3);
+      cameraRef.current.lookAt(0, 0, 0);
     }
   };
 
   const handleReset = () => {
     if (cameraRef.current) {
-      cameraRef.current.position.z = 3;
+      cameraRef.current.position.z = defaultZoomDistance;
+      cameraRef.current.lookAt(0, 0, 0);
     }
     targetRotation.current = { x: 0, y: 0 };
   };
@@ -402,7 +498,7 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
   return (
     <div className="relative w-full h-full bg-[#0d0d0d]/80 backdrop-blur-sm border border-cyan-900/30 rounded-lg overflow-hidden">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-[#0a0a0a] to-transparent pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-[#0a0a0a] to-transparent">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Crosshair className="w-4 h-4 text-cyan-400" />
