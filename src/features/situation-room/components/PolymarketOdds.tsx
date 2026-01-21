@@ -109,7 +109,7 @@ export default function PolymarketOdds() {
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-gray-500">Probability</span>
                     <span className={`text-sm font-bold ${getProbabilityColor(item.probability)}`}>
-                      {item.probability}%
+                      {item.probability.toFixed(2)}%
                     </span>
                   </div>
                   <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
