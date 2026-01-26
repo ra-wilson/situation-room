@@ -28,20 +28,20 @@ export default function PolymarketOdds() {
     }
   };
 
-  const getTrendIcon = (trend) => {
+  const getTrendIcon = (trend: PredictionMarket["trend"] | undefined) => {
     if (trend === 'up') return <TrendingUp className="w-3 h-3 text-green-400" />;
     if (trend === 'down') return <TrendingDown className="w-3 h-3 text-red-400" />;
     return <div className="w-3 h-0.5 bg-gray-500 rounded" />;
   };
 
-  const getProbabilityColor = (prob) => {
+  const getProbabilityColor = (prob: number) => {
     if (prob >= 70) return 'text-green-400';
     if (prob >= 40) return 'text-yellow-400';
     if (prob >= 20) return 'text-orange-400';
     return 'text-red-400';
   };
 
-  const getCategoryColor = (category) => {
+  const getCategoryColor = (category?: string) => {
     switch (category?.toLowerCase()) {
       case 'conflict': return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'election': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
@@ -78,14 +78,14 @@ export default function PolymarketOdds() {
       </div>
 
       {/* Odds List */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar market-scrollbar">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
             <span className="text-[10px] text-amber-600 tracking-wider">CALCULATING PROBABILITIES...</span>
           </div>
         ) : (
-          <div className="p-2 space-y-2">
+          <div className="p-2 pr-3 space-y-2">
             {odds.map((item, index) => (
               <div
                 key={index}

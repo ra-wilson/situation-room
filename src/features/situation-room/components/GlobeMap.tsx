@@ -84,10 +84,10 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
         };
 
         if (geometry.type === 'Polygon') {
-          geometry.coordinates.forEach(ring => processCoordinates(ring));
+          geometry.coordinates.forEach((ring: number[][]) => processCoordinates(ring));
         } else if (geometry.type === 'MultiPolygon') {
-          geometry.coordinates.forEach(polygon => {
-            polygon.forEach((ring) => processCoordinates(ring));
+          geometry.coordinates.forEach((polygon: number[][][]) => {
+            polygon.forEach((ring: number[][]) => processCoordinates(ring));
           });
         }
       });
@@ -258,7 +258,7 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
           targetRotation.current.y += 0.001;
         }
 
-        markersRef.current.forEach(marker => {
+        markersRef.current.forEach((marker: THREE.Object3D) => {
           marker.lookAt(camera.position);
         });
 
@@ -363,9 +363,10 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
   // Update markers when news data changes
   useEffect(() => {
     if (!isGlobeReady || !globeRef.current || !newsData.length) return;
+    const globe = globeRef.current;
 
-    markersRef.current.forEach(marker => {
-      globeRef.current.remove(marker);
+    markersRef.current.forEach((marker: THREE.Object3D) => {
+      globe.remove(marker);
     });
     markersRef.current = [];
 
@@ -426,7 +427,7 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
       markerGroup.userData = { news, index };
 
       markerGroup.renderOrder = 2;
-      globeRef.current.add(markerGroup);
+      globe.add(markerGroup);
       markersRef.current.push(markerGroup);
     });
 
@@ -447,11 +448,13 @@ export default function GlobeMap({ newsData, onSelectNews, countries, selectedCo
 
     const handleClick = (e: MouseEvent) => {
       if (!rendererRef.current) return;
+      const camera = cameraRef.current;
+      if (!camera) return;
       const rect = rendererRef.current.domElement.getBoundingClientRect();
       mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-      raycaster.setFromCamera(mouse, cameraRef.current);
+      raycaster.setFromCamera(mouse, camera);
       
       const intersects = raycaster.intersectObjects(markersRef.current, true);
       if (intersects.length > 0) {

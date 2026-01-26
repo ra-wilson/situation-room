@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { MapPin, RefreshCw, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { situationService } from '../services/situationService';
-import type { NewsItem } from '../domain/types';
+import type { NewsCategory, NewsItem, ThreatLevel } from '../domain/types';
 
 type NewsFeedProps = {
   onSelectNews: (news: NewsItem) => void;
@@ -28,10 +28,44 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
     return null;
   };
 
+  const normalizeThreatLevel = (value: unknown): ThreatLevel => {
+    if (typeof value !== 'string') return 'low';
+    const normalized = value.toLowerCase();
+    if (
+      normalized === 'low' ||
+      normalized === 'moderate' ||
+      normalized === 'high' ||
+      normalized === 'critical'
+    ) {
+      return normalized;
+    }
+    return 'low';
+  };
+
+  const normalizeCategory = (value: unknown): NewsCategory => {
+    if (typeof value !== 'string') return 'conflict';
+    const normalized = value.toLowerCase();
+    if (
+      normalized === 'conflict' ||
+      normalized === 'election' ||
+      normalized === 'economy' ||
+      normalized === 'diplomacy' ||
+      normalized === 'leadership' ||
+      normalized === 'nuclear' ||
+      normalized === 'cyber' ||
+      normalized === 'political'
+    ) {
+      return normalized;
+    }
+    return 'conflict';
+  };
+
   const normalizeNewsItem = (item: unknown, index: number): NewsItem => {
     const raw = item as Record<string, unknown>;
     const lat = toNumber(raw.lat ?? raw.latitude);
     const lng = toNumber(raw.lng ?? raw.longitude);
+    const threatLevel = normalizeThreatLevel(raw.threat_level ?? raw.threatLevel);
+    const category = normalizeCategory(raw.category);
 
     return {
       id: typeof raw.id === 'string' ? raw.id : `news-${index}`,
@@ -42,12 +76,7 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
           ? raw.title
           : 'Untitled',
       summary: typeof raw.summary === 'string' ? raw.summary : '',
-      threat_level:
-        typeof raw.threat_level === 'string'
-          ? raw.threat_level
-          : typeof raw.threatLevel === 'string'
-          ? raw.threatLevel
-          : 'low',
+      threat_level: threatLevel,
       region:
         typeof raw.region === 'string'
           ? raw.region
@@ -59,7 +88,7 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
       country: typeof raw.country === 'string' ? raw.country : undefined,
       lat: lat ?? 0,
       lng: lng ?? 0,
-      category: typeof raw.category === 'string' ? raw.category : 'conflict',
+      category: category,
       timestamp: typeof raw.timestamp === 'string' ? raw.timestamp : undefined,
     };
   };
@@ -77,7 +106,7 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
     }
   };
 
-  const getThreatColor = (level) => {
+  const getThreatColor = (level?: ThreatLevel) => {
     switch (level?.toLowerCase()) {
       case 'critical': return 'bg-red-500/20 text-red-400 border-red-500/50';
       case 'high': return 'bg-orange-500/20 text-orange-400 border-orange-500/50';
@@ -86,7 +115,7 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
     }
   };
 
-  const getCategoryIcon = (category) => {
+  const getCategoryIcon = (category?: NewsCategory) => {
     switch (category?.toLowerCase()) {
       case 'conflict': return '⚔️';
       case 'nuclear': return '☢️';
@@ -123,7 +152,7 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
       </div>
 
       {/* News Items */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar news-scrollbar">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
