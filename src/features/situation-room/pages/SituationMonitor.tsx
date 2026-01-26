@@ -156,7 +156,7 @@ export default function SituationMonitor() {
         <MarketTickers />
 
         {/* Main Content */}
-        <div className="pt-24 pb-4 px-4 flex flex-col xl:flex-row gap-4 xl:h-screen">
+        <div className="pt-28 pb-4 pl pr-2 flex flex-col xl:flex-row gap-4 xl:h-screen">
           {/* Left Panel - News Feed */}
           <div className="w-full xl:w-80 flex-shrink-0">
             <NewsFeed 

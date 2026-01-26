@@ -22,13 +22,13 @@ export default function MarketTickers() {
     }
   };
 
-  const getChangeIcon = (change) => {
+  const getChangeIcon = (change: number) => {
     if (change > 0) return <TrendingUp className="w-3 h-3" />;
     if (change < 0) return <TrendingDown className="w-3 h-3" />;
     return <Minus className="w-3 h-3" />;
   };
 
-  const getChangeColor = (change) => {
+  const getChangeColor = (change: number) => {
     if (change > 0) return 'text-green-400';
     if (change < 0) return 'text-red-400';
     return 'text-gray-400';
