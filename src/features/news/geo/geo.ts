@@ -20,21 +20,23 @@ type PrismaLike = {
   };
 };
 
-const COUNTRY_CENTROIDS: Record<string, { lat: number; lng: number }> = {
-  "United States": { lat: 39.7837304, lng: -100.4458825 },
-  "United Kingdom": { lat: 55.378051, lng: -3.435973 },
-  Russia: { lat: 61.52401, lng: 105.318756 },
-  Ukraine: { lat: 48.379433, lng: 31.16558 },
-  China: { lat: 35.86166, lng: 104.195397 },
-  Taiwan: { lat: 23.69781, lng: 120.960515 },
-  Israel: { lat: 31.046051, lng: 34.851612 },
-  Iran: { lat: 32.427908, lng: 53.688046 },
-  "North Korea": { lat: 40.339852, lng: 127.510093 },
-  "South Korea": { lat: 35.907757, lng: 127.766922 },
-  India: { lat: 20.593684, lng: 78.96288 },
-  Pakistan: { lat: 30.375321, lng: 69.345116 },
-  Turkey: { lat: 38.963745, lng: 35.243322 },
+const COUNTRY_CAPITALS: Record<string, { lat: number; lng: number }> = {
+  "United States": { lat: 38.9072, lng: -77.0369 },
+  "United Kingdom": { lat: 51.5074, lng: -0.1278 },
+  Russia: { lat: 55.7558, lng: 37.6173 },
+  Ukraine: { lat: 50.4501, lng: 30.5234 },
+  China: { lat: 39.9042, lng: 116.4074 },
+  Taiwan: { lat: 25.033, lng: 121.5654 },
+  Israel: { lat: 31.7683, lng: 35.2137 },
+  Iran: { lat: 35.6892, lng: 51.389 },
+  "North Korea": { lat: 39.0392, lng: 125.7625 },
+  "South Korea": { lat: 37.5665, lng: 126.978 },
+  India: { lat: 28.6139, lng: 77.209 },
+  Pakistan: { lat: 33.6844, lng: 73.0479 },
+  Turkey: { lat: 39.9334, lng: 32.8597 },
 };
+
+const DEFAULT_CAPITAL = { lat: 38.9072, lng: -77.0369 };
 
 export const assignGeoToEvents = async (
   events: EventInput[],
@@ -50,11 +52,11 @@ export const assignGeoToEvents = async (
 
     const primaryCountry = event.countries?.[0];
     const centroid = primaryCountry
-      ? COUNTRY_CENTROIDS[primaryCountry]
+      ? COUNTRY_CAPITALS[primaryCountry]
       : undefined;
 
-    const lat = centroid?.lat ?? 0;
-    const lng = centroid?.lng ?? 0;
+    const lat = centroid?.lat ?? DEFAULT_CAPITAL.lat;
+    const lng = centroid?.lng ?? DEFAULT_CAPITAL.lng;
     const theatres =
       centroid || (event.theatres && event.theatres.length > 0)
         ? event.theatres ?? []

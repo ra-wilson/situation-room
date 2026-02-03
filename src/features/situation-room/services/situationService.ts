@@ -1,12 +1,12 @@
 import type { HistoricalContext, MarketTicker, NewsItem, PredictionMarket } from "../domain/types";
 import { getMockContext, getMockMarkets, getMockNews, getMockPolymarkets } from "../data/mock";
 
-const USE_API = false; // flip later
+const USE_API = true; // flip later
 
 export const situationService = {
   async getNews(): Promise<NewsItem[]> {
     if (!USE_API) return getMockNews();
-    const res = await fetch("/api/news");
+    const res = await fetch("/api/news/events");
     if (!res.ok) throw new Error("Failed to load news");
     return res.json();
   },

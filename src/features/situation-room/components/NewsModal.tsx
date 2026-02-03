@@ -18,7 +18,18 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
 
   if (!news) return null;
 
+  const inlineHistoricalContext =
+    typeof news.historicalContext === 'string' ? news.historicalContext.trim() : '';
+  const hasInlineContext = inlineHistoricalContext.length > 0;
+  const titleLabel = news.title ?? 'Untitled';
+  const summaryLabel = news.summary ?? 'Summary unavailable.';
+
   const fetchHistoricalContext = async () => {
+    if (hasInlineContext) {
+      setShowContext(!showContext);
+      return;
+    }
+
     if (historicalContext) {
       setShowContext(!showContext);
       return;
@@ -120,7 +131,7 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
           {/* Content */}
           <div className="p-6 space-y-4">
             <h2 className="text-xl font-bold text-white leading-tight">
-              {news.headline}
+              {titleLabel}
             </h2>
 
             <div className="flex items-center gap-4 text-sm">
@@ -142,7 +153,7 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
                 <span className="text-[10px] text-cyan-400 tracking-wider font-bold">INTELLIGENCE SUMMARY</span>
               </div>
               <p className="text-sm text-gray-300 leading-relaxed">
-                {news.summary}
+                {summaryLabel}
               </p>
             </div>
 
@@ -180,6 +191,10 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
                           <Loader2 className="w-6 h-6 text-amber-400 animate-spin" />
                           <span className="text-[10px] text-amber-600 tracking-wider">ANALYZING HISTORICAL DATA...</span>
                         </div>
+                      ) : hasInlineContext ? (
+                        <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">
+                          {inlineHistoricalContext}
+                        </p>
                       ) : historicalContext ? (
                         <div className="space-y-4">
                           {historicalContext.title && (
@@ -223,6 +238,28 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
                 )}
               </AnimatePresence>
             </div>
+
+            {news.sources.length > 0 && (
+              <div className="bg-[#111]/40 border border-cyan-900/20 rounded p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[10px] text-cyan-400 tracking-wider font-bold">SOURCES</span>
+                </div>
+                <ul className="space-y-2 text-xs text-cyan-200">
+                  {news.sources.map((source, idx) => (
+                    <li key={`${source}-${idx}`}>
+                      <a
+                        href={source}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline decoration-dotted hover:text-cyan-100"
+                      >
+                        {source}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Coordinates */}
             {(news.lat !== undefined && news.lng !== undefined) && (

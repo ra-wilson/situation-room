@@ -3,9 +3,11 @@ import type { HistoricalContext, MarketTicker, NewsItem, PredictionMarket } from
 const mockNews: NewsItem[] = [
   {
     id: "news-1",
-    headline: "Baltic airspace incident raises NATO alert",
+    title: "Baltic airspace incident raises NATO alert",
     summary:
       "Unscheduled military aircraft activity near Baltic borders triggered heightened monitoring. Officials say air patrols remain defensive and no incursions occurred.",
+    historicalContext: null,
+    sources: [],
     threat_level: "moderate",
     region: "Baltic Sea",
     country: "Lithuania",
@@ -16,9 +18,11 @@ const mockNews: NewsItem[] = [
   },
   {
     id: "news-2",
-    headline: "Red Sea shipping reroutes after drone strikes",
+    title: "Red Sea shipping reroutes after drone strikes",
     summary:
       "Commercial carriers announce temporary diversion around the Red Sea following a series of drone attacks near key transit lanes. Insurance premiums are climbing.",
+    historicalContext: null,
+    sources: [],
     threat_level: "high",
     region: "Red Sea",
     country: "Yemen",
@@ -29,9 +33,11 @@ const mockNews: NewsItem[] = [
   },
   {
     id: "news-3",
-    headline: "Central bank signals extended rate hold",
+    title: "Central bank signals extended rate hold",
     summary:
       "Policymakers indicated rates will stay elevated as inflation remains sticky. Markets recalibrated expectations for cuts later this year.",
+    historicalContext: null,
+    sources: [],
     threat_level: "low",
     region: "North America",
     country: "United States",
@@ -42,9 +48,11 @@ const mockNews: NewsItem[] = [
   },
   {
     id: "news-4",
-    headline: "West Africa election runoff set for next month",
+    title: "West Africa election runoff set for next month",
     summary:
       "A tightly contested runoff is scheduled after no candidate secured a majority. Observers report high turnout and a calm voting process.",
+    historicalContext: null,
+    sources: [],
     threat_level: "moderate",
     region: "West Africa",
     country: "Ghana",
@@ -55,9 +63,11 @@ const mockNews: NewsItem[] = [
   },
   {
     id: "news-5",
-    headline: "Backchannel talks resume on regional ceasefire",
+    title: "Backchannel talks resume on regional ceasefire",
     summary:
       "Diplomats confirmed renewed talks aimed at restoring a fragile ceasefire. Negotiators are discussing prisoner exchanges and aid corridors.",
+    historicalContext: null,
+    sources: [],
     threat_level: "high",
     region: "Levant",
     country: "Israel",
@@ -68,9 +78,11 @@ const mockNews: NewsItem[] = [
   },
   {
     id: "news-6",
-    headline: "Cyber unit claims disruption of power grid",
+    title: "Cyber unit claims disruption of power grid",
     summary:
       "Authorities are investigating a claim of cyber intrusion targeting grid operators. Contingency protocols were activated as a precaution.",
+    historicalContext: null,
+    sources: [],
     threat_level: "moderate",
     region: "Eastern Europe",
     country: "Ukraine",
@@ -81,9 +93,11 @@ const mockNews: NewsItem[] = [
   },
   {
     id: "news-7",
-    headline: "Asian summit signals cautious trade thaw",
+    title: "Asian summit signals cautious trade thaw",
     summary:
       "Leaders signaled progress on reopening trade channels while maintaining strategic export controls. Markets reacted cautiously.",
+    historicalContext: null,
+    sources: [],
     threat_level: "low",
     region: "East Asia",
     country: "Japan",
@@ -94,9 +108,11 @@ const mockNews: NewsItem[] = [
   },
   {
     id: "news-8",
-    headline: "Rocket test prompts regional air defense alert",
+    title: "Rocket test prompts regional air defense alert",
     summary:
       "A ballistic missile test triggered air defense alerts across neighboring states. Officials condemned the launch and called for restraint.",
+    historicalContext: null,
+    sources: [],
     threat_level: "critical",
     region: "Korean Peninsula",
     country: "North Korea",

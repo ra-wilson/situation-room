@@ -75,19 +75,19 @@ const KEYWORDS = [
 ] as const;
 
 const THEATRES: Record<string, string> = {
-  "United States": "americas",
-  "United Kingdom": "europe",
-  Russia: "europe",
-  Ukraine: "europe",
-  China: "asia-pacific",
-  Taiwan: "asia-pacific",
-  Israel: "middle-east",
-  Iran: "middle-east",
-  "North Korea": "asia-pacific",
-  "South Korea": "asia-pacific",
-  India: "south-asia",
-  Pakistan: "south-asia",
-  Turkey: "europe",
+  "United States": "North America",
+  "United Kingdom": "Europe",
+  Russia: "Europe",
+  Ukraine: "Europe",
+  China: "Asia-Pacific",
+  Taiwan: "Asia-Pacific",
+  Israel: "Middle East",
+  Iran: "Middle East",
+  "North Korea": "Asia-Pacific",
+  "South Korea": "Asia-Pacific",
+  India: "South Asia",
+  Pakistan: "South Asia",
+  Turkey: "Europe",
 };
 
 const slugify = (value: string): string =>
@@ -284,6 +284,7 @@ export const upsertEventsFromArticles = async (
     const mergedCountries = mergeCountries(group.countries);
     const theatres = toTheatres(mergedCountries);
     const title = pickBestTitle(group.articles);
+    const now = new Date();
 
     const data: EventCreateArgs = {
       eventKey: group.eventKey,
@@ -291,8 +292,8 @@ export const upsertEventsFromArticles = async (
       countries: mergedCountries,
       theatres,
       severity: "low",
-      firstSeenAt: group.firstSeenAt,
-      lastSeenAt: group.lastSeenAt,
+      firstSeenAt: now,
+      lastSeenAt: now,
     };
 
     const existing = await prisma.event.findUnique({
@@ -300,17 +301,6 @@ export const upsertEventsFromArticles = async (
     });
 
     if (existing) {
-      const firstSeenAt = existing.firstSeenAt
-        ? existing.firstSeenAt < group.firstSeenAt
-          ? existing.firstSeenAt
-          : group.firstSeenAt
-        : group.firstSeenAt;
-      const lastSeenAt = existing.lastSeenAt
-        ? existing.lastSeenAt > group.lastSeenAt
-          ? existing.lastSeenAt
-          : group.lastSeenAt
-        : group.lastSeenAt;
-
       await prisma.event.update({
         where: { eventKey: group.eventKey },
         data: {
@@ -318,8 +308,7 @@ export const upsertEventsFromArticles = async (
           countries: mergedCountries,
           theatres,
           severity: "low",
-          firstSeenAt,
-          lastSeenAt,
+          lastSeenAt: now,
         },
       });
       metrics.updated += 1;

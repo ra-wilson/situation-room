@@ -1,15 +1,9 @@
 export const RSS_FEEDS = [
   {
-    id: "reuters-world",
-    name: "Reuters World",
-    url: "https://feeds.reuters.com/Reuters/worldNews",
-    weight: 1.0,
-  },
-  {
     id: "bbc-world",
     name: "BBC World",
     url: "https://feeds.bbci.co.uk/news/world/rss.xml",
-    weight: 0.95,
+    weight: 1.0,
   },
   {
     id: "financial-times-world",
@@ -21,7 +15,7 @@ export const RSS_FEEDS = [
     id: "al-jazeera",
     name: "Al Jazeera",
     url: "https://www.aljazeera.com/xml/rss/all.xml",
-    weight: 0.9,
+    weight: 0.95,
   },
   {
     id: "foreign-policy",
@@ -30,16 +24,10 @@ export const RSS_FEEDS = [
     weight: 0.85,
   },
   {
-    id: "council-on-foreign-relations",
-    name: "Council on Foreign Relations",
-    url: "https://www.cfr.org/rss/global",
-    weight: 0.85,
-  },
-  {
     id: "the-guardian-world",
     name: "The Guardian World",
     url: "https://www.theguardian.com/world/rss",
-    weight: 0.8,
+    weight: 0.9,
   },
   {
     id: "the-geopolitics",

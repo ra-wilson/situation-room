@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { z } from "zod";
 
 type EventInput = {
   id: string;
@@ -7,18 +7,15 @@ type EventInput = {
 
 type RawArticleInput = {
   title?: string | null;
-  excerpt?: string | null;
   url?: string | null;
   source?: string | null;
+  publishedAt?: Date | string | null;
 };
 
 export type SummaryPayload = {
-  title: string;
   summary: string;
   historicalContext: string;
   severity: "low" | "medium" | "high";
-  countries: string[];
-  theatres: string[];
   sources: string[];
 };
 
@@ -26,6 +23,7 @@ export type SummariseResult = {
   skipped: boolean;
   inputHash: string;
   payload: SummaryPayload | null;
+  status: "skipped" | "parsed_ok" | "parsed_failed" | "llm_error";
 };
 
 type LlmClient = {
@@ -37,10 +35,9 @@ type PrismaLike = {
     update: (args: {
       where: { id: string };
       data: {
-        title?: string;
-        severity?: string;
-        countries?: string[];
-        theatres?: string[];
+        summary?: string;
+        severity?: "low" | "medium" | "high";
+        lastSeenAt?: Date;
       };
     }) => Promise<unknown>;
   };
@@ -57,62 +54,64 @@ type PrismaLike = {
   };
 };
 
-const allowedSeverity = new Set(["low", "medium", "high"]);
+const summarySchema = z.object({
+  summary: z.string().trim().min(1),
+  historicalContext: z.string().trim().min(1),
+  severity: z.preprocess(
+    (value) => {
+      if (typeof value !== "string") return value;
+      const normalized = value.trim().toLowerCase();
+      return normalized ? normalized : undefined;
+    },
+    z.enum(["low", "medium", "high"]).default("low"),
+  ),
+  sources: z.array(z.string().trim().min(1)).min(1),
+});
 
-const normalizeList = (value: unknown): string[] => {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const list: string[] = [];
-  for (const item of value) {
-    if (typeof item !== "string") continue;
-    const trimmed = item.trim();
-    if (!trimmed || seen.has(trimmed)) continue;
-    seen.add(trimmed);
-    list.push(trimmed);
-  }
-  return list;
-};
-
-const toSeverity = (value: unknown): "low" | "medium" | "high" => {
-  if (typeof value !== "string") return "low";
-  const normalized = value.toLowerCase();
-  if (allowedSeverity.has(normalized)) {
-    return normalized as "low" | "medium" | "high";
-  }
-  return "low";
+const toIsoString = (value: Date | string | null | undefined): string | null => {
+  if (!value) return null;
+  if (typeof value === "string") return value.trim() || null;
+  return value.toISOString();
 };
 
 const buildInputHash = (articles: RawArticleInput[]): string => {
   const parts = articles
     .map((article) => ({
-      url: article.url?.trim() ?? "",
       title: article.title?.trim() ?? "",
+      url: article.url?.trim() ?? "",
+      publishedAt: toIsoString(article.publishedAt),
     }))
     .filter((item) => item.url && item.title)
-    .map((item) => `${item.url}|${item.title}`)
-    .sort();
-  return createHash("sha256").update(parts.join("||")).digest("hex");
+    .sort((a, b) => {
+      if (a.url !== b.url) return a.url.localeCompare(b.url);
+      if (a.title !== b.title) return a.title.localeCompare(b.title);
+      return (a.publishedAt ?? "").localeCompare(b.publishedAt ?? "");
+    });
+
+  return JSON.stringify(parts);
 };
 
-const parsePayload = (value: string | SummaryPayload): SummaryPayload | null => {
-  if (typeof value !== "string") return value;
+const parsePayload = (value: string | SummaryPayload) => {
+  if (typeof value !== "string") {
+    return { rawText: JSON.stringify(value), parsed: value };
+  }
   try {
-    return JSON.parse(value) as SummaryPayload;
+    return { rawText: value, parsed: JSON.parse(value) as SummaryPayload };
   } catch {
-    return null;
+    return { rawText: value, parsed: null };
   }
 };
 
-const pickFallbackTitle = (
-  event: EventInput,
-  articles: RawArticleInput[],
-): string => {
-  if (event.title?.trim()) return event.title.trim();
-  for (const article of articles) {
-    if (article.title?.trim()) return article.title.trim();
-  }
-  return "Situation update";
-};
+const summarizeZodError = (error: z.ZodError): string =>
+  error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "root";
+      return `${path}: ${issue.message}`;
+    })
+    .join("; ");
+
+const truncateText = (value: string, max = 300): string =>
+  value.length > max ? `${value.slice(0, max - 3)}...` : value;
 
 const buildPrompt = (
   event: EventInput,
@@ -120,13 +119,13 @@ const buildPrompt = (
 ): string => {
   const articleLines = articles.map((article, index) => {
     const title = article.title?.trim() ?? "Untitled";
-    const excerpt = article.excerpt?.trim() ?? "";
     const url = article.url?.trim() ?? "";
     const source = article.source?.trim() ?? "";
+    const publishedAt = toIsoString(article.publishedAt) ?? "Unknown";
     return [
       `Article ${index + 1}:`,
       `Title: ${title}`,
-      excerpt ? `Excerpt: ${excerpt}` : "Excerpt: (none)",
+      `PublishedAt: ${publishedAt}`,
       source ? `Source: ${source}` : "Source: (unknown)",
       url ? `URL: ${url}` : "URL: (missing)",
     ].join("\n");
@@ -134,12 +133,13 @@ const buildPrompt = (
 
   return [
     "You are an analyst summarizing geopolitical events for non-experts.",
-    "Return ONLY valid JSON with keys: title, summary, historicalContext, severity, countries, theatres, sources.",
+    "You must return ONLY valid JSON matching this schema:",
+    '{ "summary": "string", "historicalContext": "string", "severity": "low | medium | high", "sources": ["string"] }',
+    "Do not include markdown, explanation, or prose. Output JSON only.",
     "summary: 4-6 sentences, neutral, plain language.",
     "historicalContext: bulleted timeline of related historical events, 200-350 words max.",
     "severity: low, medium, or high.",
-    "countries and theatres: arrays of strings.",
-    "sources: only URLs from the provided articles; do not invent any sources.",
+    "sources: array of URL strings; only URLs from the provided articles; do not invent any sources.",
     `Event context title: ${event.title ?? "(none)"}`,
     "",
     "Articles:",
@@ -159,34 +159,76 @@ export const summariseEvent = async (
   });
 
   if (existing?.inputHash && existing.inputHash === inputHash) {
+    console.info("summariseEvent status", {
+      status: "skipped",
+      eventId: event.id,
+      inputHash,
+    });
     return {
       skipped: true,
       inputHash,
       payload: existing.payload ?? null,
+      status: "skipped",
     };
   }
 
   const prompt = buildPrompt(event, articles);
-  const raw = await llm.complete(prompt);
-  const parsed = parsePayload(raw);
-  if (!parsed) {
-    return { skipped: false, inputHash, payload: null };
+  let raw: string | SummaryPayload;
+  try {
+    raw = await llm.complete(prompt);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const name = error instanceof Error ? error.name : "Error";
+    console.error("summariseEvent status", {
+      status: "llm_error",
+      eventId: event.id,
+      inputHash,
+      error: `${name}: ${message}`,
+    });
+    return { skipped: false, inputHash, payload: null, status: "llm_error" };
+  }
+
+  const { rawText, parsed } = parsePayload(raw);
+  const parsedResult = summarySchema.safeParse(parsed);
+
+  if (!parsedResult.success) {
+    console.warn("summariseEvent status", {
+      status: "parsed_failed",
+      eventId: event.id,
+      inputHash,
+      error: summarizeZodError(parsedResult.error),
+      rawSnippet: truncateText(rawText),
+    });
+    return { skipped: false, inputHash, payload: null, status: "parsed_failed" };
   }
 
   const allowedUrls = new Set(
     articles.map((article) => article.url?.trim()).filter(Boolean) as string[],
   );
-  const sources = normalizeList(parsed.sources).filter((source) =>
-    allowedUrls.has(source),
-  );
+  const sources: string[] = [];
+  const seen = new Set<string>();
+  for (const source of parsedResult.data.sources) {
+    const url = source.trim();
+    if (!allowedUrls.has(url) || seen.has(url)) continue;
+    seen.add(url);
+    sources.push(url);
+  }
+
+  if (sources.length === 0) {
+    console.warn("summariseEvent status", {
+      status: "parsed_failed",
+      eventId: event.id,
+      inputHash,
+      error: "validation_failed: missing allowed sources",
+      rawSnippet: truncateText(rawText),
+    });
+    return { skipped: false, inputHash, payload: null, status: "parsed_failed" };
+  }
 
   const payload: SummaryPayload = {
-    title: parsed.title?.trim() || pickFallbackTitle(event, articles),
-    summary: parsed.summary?.trim() || "",
-    historicalContext: parsed.historicalContext?.trim() || "",
-    severity: toSeverity(parsed.severity),
-    countries: normalizeList(parsed.countries),
-    theatres: normalizeList(parsed.theatres),
+    summary: parsedResult.data.summary,
+    historicalContext: parsedResult.data.historicalContext,
+    severity: parsedResult.data.severity,
     sources,
   };
 
@@ -199,12 +241,17 @@ export const summariseEvent = async (
   await prisma.event.update({
     where: { id: event.id },
     data: {
-      title: payload.title,
+      summary: payload.summary,
       severity: payload.severity,
-      countries: payload.countries,
-      theatres: payload.theatres,
+      lastSeenAt: new Date(),
     },
   });
 
-  return { skipped: false, inputHash, payload };
+  console.info("summariseEvent status", {
+    status: "parsed_ok",
+    eventId: event.id,
+    inputHash,
+  });
+
+  return { skipped: false, inputHash, payload, status: "parsed_ok" };
 };

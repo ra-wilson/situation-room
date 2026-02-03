@@ -25,22 +25,36 @@ model RawArticle {
 }
 
 model Event {
-  id        String       @id @default(cuid())
-  eventKey  String       @unique
-  title     String?
-  summary   String?
-  startsAt  DateTime?
-  endsAt    DateTime?
-  output    EventOutput?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id          String       @id @default(cuid())
+  eventKey    String       @unique
+  title       String?
+  summary     String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  firstSeenAt DateTime     @default(now())
+  lastSeenAt  DateTime     @updatedAt
+  severity    Severity     @default(low)
+  countries   String[]     @default([])
+  theatres    String[]     @default([])
+  lat         Float?
+  lng         Float?
+  output      EventOutput?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model EventOutput {
   id        String   @id @default(cuid())
   eventId   String   @unique
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  inputHash String?
   payload   Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum Severity {
+  low
+  medium
+  high
 }

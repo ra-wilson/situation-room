@@ -5,6 +5,9 @@ import { MAX_ARTICLES_PER_FEED } from "../config";
 export type IngestMetrics = {
   feedsProcessed: number;
   feedsFailed: number;
+  failedFeedUrls: string[];
+  failedFeedErrors: Array<{ url: string; error: string }>;
+  failedFeedStatuses: Array<{ url: string; status: number }>;
   itemsFetched: number;
   itemsSkipped: number;
   itemsUpserted: number;
@@ -51,6 +54,62 @@ const toHostname = (value?: string): string | undefined => {
   }
 };
 
+const toErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return "Unknown error";
+  }
+};
+
+const truncateMessage = (value: string, max = 200): string =>
+  value.length > max ? `${value.slice(0, max - 3)}...` : value;
+
+const validateFeedUrl = async (
+  feedUrl: string,
+): Promise<{ ok: true } | { ok: false; status?: number; error?: string }> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(feedUrl, { signal: controller.signal });
+    if (!response.ok) {
+      return { ok: false, status: response.status };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: truncateMessage(toErrorMessage(error)) };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+export const validateFeeds = async (
+  feeds: string[],
+): Promise<{ okFeeds: string[]; badFeeds: Array<{ url: string; error: string }> }> => {
+  const results = await Promise.all(
+    feeds.map(async (url) => ({ url, result: await validateFeedUrl(url) })),
+  );
+
+  const okFeeds: string[] = [];
+  const badFeeds: Array<{ url: string; error: string }> = [];
+
+  for (const { url, result } of results) {
+    if (result.ok) {
+      okFeeds.push(url);
+      continue;
+    }
+    if (typeof result.status === "number") {
+      badFeeds.push({ url, error: `HTTP ${result.status}` });
+    } else {
+      badFeeds.push({ url, error: result.error ?? "Unknown error" });
+    }
+  }
+
+  return { okFeeds, badFeeds };
+};
+
 export const ingestFeeds = async (
   feeds: string[],
   prisma: PrismaLike,
@@ -58,6 +117,9 @@ export const ingestFeeds = async (
   const metrics: IngestMetrics = {
     feedsProcessed: 0,
     feedsFailed: 0,
+    failedFeedUrls: [],
+    failedFeedErrors: [],
+    failedFeedStatuses: [],
     itemsFetched: 0,
     itemsSkipped: 0,
     itemsUpserted: 0,
@@ -65,12 +127,35 @@ export const ingestFeeds = async (
   };
 
   for (const feedUrl of feeds) {
+    const validation = await validateFeedUrl(feedUrl);
+    if (!validation.ok) {
+      metrics.feedsFailed += 1;
+      metrics.failedFeedUrls.push(feedUrl);
+      if (typeof validation.status === "number") {
+        metrics.failedFeedStatuses.push({
+          url: feedUrl,
+          status: validation.status,
+        });
+      } else {
+        metrics.failedFeedErrors.push({
+          url: feedUrl,
+          error: validation.error ?? "Unknown error",
+        });
+      }
+      continue;
+    }
+
     let feed;
     try {
       feed = await parser.parseURL(feedUrl);
       metrics.feedsProcessed += 1;
-    } catch {
+    } catch (error) {
       metrics.feedsFailed += 1;
+      metrics.failedFeedUrls.push(feedUrl);
+      metrics.failedFeedErrors.push({
+        url: feedUrl,
+        error: truncateMessage(toErrorMessage(error)),
+      });
       continue;
     }
 

@@ -60,32 +60,59 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
     return 'conflict';
   };
 
+  const formatRegionLabel = (value: string): string => {
+    const normalized = value.trim().toLowerCase();
+    const replacements: Record<string, string> = {
+      americas: 'North America',
+      'north-america': 'North America',
+      'south-america': 'South America',
+      europe: 'Europe',
+      'asia-pacific': 'Asia-Pacific',
+      'south-asia': 'South Asia',
+      'middle-east': 'Middle East',
+    };
+
+    if (replacements[normalized]) return replacements[normalized];
+
+    return value
+      .split(' ')
+      .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+      .join(' ');
+  };
+
   const normalizeNewsItem = (item: unknown, index: number): NewsItem => {
     const raw = item as Record<string, unknown>;
     const lat = toNumber(raw.lat ?? raw.latitude);
     const lng = toNumber(raw.lng ?? raw.longitude);
     const threatLevel = normalizeThreatLevel(raw.threat_level ?? raw.threatLevel);
     const category = normalizeCategory(raw.category);
+    const countries = Array.isArray(raw.countries)
+      ? raw.countries.filter((value): value is string => typeof value === 'string')
+      : [];
+    const theatres = Array.isArray(raw.theatres)
+      ? raw.theatres.filter((value): value is string => typeof value === 'string')
+      : [];
+    const regionLabel =
+      typeof raw.region === 'string'
+        ? formatRegionLabel(raw.region)
+        : typeof raw.regionName === 'string'
+        ? formatRegionLabel(raw.regionName)
+        : theatres[0]
+        ? formatRegionLabel(theatres[0])
+        : countries[0] ?? 'Unknown';
 
     return {
       id: typeof raw.id === 'string' ? raw.id : `news-${index}`,
-      headline:
-        typeof raw.headline === 'string'
-          ? raw.headline
-          : typeof raw.title === 'string'
-          ? raw.title
-          : 'Untitled',
-      summary: typeof raw.summary === 'string' ? raw.summary : '',
+      title: typeof raw.title === 'string' ? raw.title : null,
+      summary: typeof raw.summary === 'string' ? raw.summary : null,
+      historicalContext:
+        typeof raw.historicalContext === 'string' ? raw.historicalContext : null,
+      sources: Array.isArray(raw.sources)
+        ? raw.sources.filter((source): source is string => typeof source === 'string')
+        : [],
       threat_level: threatLevel,
-      region:
-        typeof raw.region === 'string'
-          ? raw.region
-          : typeof raw.regionName === 'string'
-          ? raw.regionName
-          : typeof raw.country === 'string'
-          ? raw.country
-          : 'Unknown',
-      country: typeof raw.country === 'string' ? raw.country : undefined,
+      region: regionLabel,
+      country: countries[0],
       lat: lat ?? 0,
       lng: lng ?? 0,
       category: category,
@@ -174,7 +201,7 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
                 </div>
                 
                 <h3 className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors leading-tight mb-2">
-                  {news.headline}
+                  {news.title ?? 'Untitled'}
                 </h3>
                 
                 <div className="flex items-center gap-3 text-[10px] text-gray-500">

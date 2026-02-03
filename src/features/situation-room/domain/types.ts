@@ -14,8 +14,10 @@ export type NewsCategory =
 
 export type NewsItem = {
   id: string;
-  headline: string;
-  summary: string;
+  title: string | null;
+  summary: string | null;
+  historicalContext: string | null;
+  sources: string[];
   threat_level: ThreatLevel;
   region: string;
   country?: string;

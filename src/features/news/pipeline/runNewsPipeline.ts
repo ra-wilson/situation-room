@@ -1,10 +1,12 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
+
 import { EVENT_LOOKBACK_HOURS, FEED_URLS, MAX_LLM_CALLS_PER_RUN } from "../config";
 import { ingestFeeds } from "../ingest/rss";
 import { upsertEventsFromArticles } from "../cluster/cluster";
 import { assignGeoToEvents } from "../geo/geo";
-import { summariseEvent } from "../llm/summariseEvent";
+import { summariseEvent, type SummaryPayload } from "../llm/summariseEvent";
 
 type RawArticleRecord = {
   title?: string | null;
@@ -32,19 +34,10 @@ type BasePrisma = Parameters<typeof ingestFeeds>[1] &
 
 type PrismaLike = BasePrisma & {
   rawArticle: BasePrisma["rawArticle"] & {
-    findMany: (args: {
-      where: Record<string, unknown>;
-      orderBy?: Array<Record<string, "asc" | "desc">>;
-      take?: number;
-      select?: Record<string, boolean>;
-    }) => Promise<RawArticleRecord[]>;
+    findMany: (args: Prisma.RawArticleFindManyArgs) => Promise<RawArticleRecord[]>;
   };
   event: BasePrisma["event"] & {
-    findMany: (args: {
-      where: Record<string, unknown>;
-      orderBy?: Record<string, "asc" | "desc">;
-      select: Record<string, boolean>;
-    }) => Promise<EventRecord[]>;
+    findMany: (args: Prisma.EventFindManyArgs) => Promise<EventRecord[]>;
   };
 };
 
@@ -59,6 +52,11 @@ export type NewsPipelineMetrics = {
     llm: number;
     total: number;
   };
+  ingestFailures: {
+    failedFeedUrls: string[];
+    failedFeedErrors: Array<{ url: string; error: string }>;
+    failedFeedStatuses: Array<{ url: string; status: number }>;
+  };
   counts: {
     feedsProcessed: number;
     feedsFailed: number;
@@ -71,10 +69,36 @@ export type NewsPipelineMetrics = {
     llmCalls: number;
     llmSkipped: number;
     llmFailed: number;
+    llmParsedOk: number;
+    llmParsedFailed: number;
+    llmErrored: number;
   };
 };
 
 const nowMs = (): number => Date.now();
+
+const parseConcurrency = (value: string | undefined, fallback: number): number => {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`LLM request timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
 
 const ensureServerOnly = (): void => {
   if (typeof window !== "undefined") {
@@ -154,7 +178,6 @@ const fetchRelatedArticles = async (
     take: limit,
     select: {
       title: true,
-      content: true,
       publishedAt: true,
       createdAt: true,
       url: true,
@@ -170,6 +193,7 @@ export const runNewsPipeline = async ({
   lookbackHours = EVENT_LOOKBACK_HOURS,
   maxLlmCalls = MAX_LLM_CALLS_PER_RUN,
   topArticlesPerEvent = 5,
+  onLlmPayload,
 }: {
   prisma: PrismaLike;
   llm?: LlmClient;
@@ -177,6 +201,7 @@ export const runNewsPipeline = async ({
   lookbackHours?: number;
   maxLlmCalls?: number;
   topArticlesPerEvent?: number;
+  onLlmPayload?: (payload: SummaryPayload | null) => void;
 }): Promise<NewsPipelineMetrics> => {
   ensureServerOnly();
   const totalStart = nowMs();
@@ -210,46 +235,83 @@ export const runNewsPipeline = async ({
   let llmCalls = 0;
   let llmSkipped = 0;
   let llmFailed = 0;
+  let llmParsedOk = 0;
+  let llmParsedFailed = 0;
+  let llmErrored = 0;
 
   if (llm) {
-    for (const event of recentEvents) {
-      if (llmCalls >= maxLlmCalls) {
-        break;
-      }
+    const llmConcurrency = parseConcurrency(
+      process.env.NEWS_LLM_CONCURRENCY,
+      3,
+    );
+    const llmTimeoutMs = 25_000;
+    const llmWithTimeout: LlmClient = {
+      complete: (prompt) => withTimeout(llm.complete(prompt), llmTimeoutMs),
+    };
+    const eventsQueue = [...recentEvents];
+    let nextIndex = 0;
+    let remainingLlmCalls = maxLlmCalls;
 
-      const related = await fetchRelatedArticles(
-        prisma,
-        event,
-        since,
-        topArticlesPerEvent,
-      );
-      try {
-        const result = await summariseEvent(
-          { id: event.id, title: event.title },
-          related.map((article) => ({
-            title: article.title ?? undefined,
-            excerpt: article.content ?? undefined,
-            url: article.url ?? undefined,
-            source: article.source ?? undefined,
-          })),
+    const runWorker = async (): Promise<void> => {
+      while (remainingLlmCalls > 0) {
+        if (nextIndex >= eventsQueue.length) return;
+        const event = eventsQueue[nextIndex];
+        nextIndex += 1;
+        if (!event) return;
+
+        remainingLlmCalls -= 1;
+        const related = await fetchRelatedArticles(
           prisma,
-          llm,
+          event,
+          since,
+          topArticlesPerEvent,
         );
+        try {
+          const result = await summariseEvent(
+            { id: event.id, title: event.title },
+            related.map((article) => ({
+              title: article.title ?? undefined,
+              url: article.url ?? undefined,
+              source: article.source ?? undefined,
+              publishedAt: article.publishedAt ?? article.createdAt ?? null,
+            })),
+            prisma,
+            llmWithTimeout,
+          );
 
-        if (result.skipped) {
-          llmSkipped += 1;
-          continue;
-        }
+          if (onLlmPayload) {
+            onLlmPayload(result.payload ?? null);
+          }
 
-        llmCalls += 1;
-        if (!result.payload) {
+          if (result.status === "skipped") {
+            llmSkipped += 1;
+            remainingLlmCalls += 1;
+            continue;
+          }
+
+          llmCalls += 1;
+          if (result.status === "parsed_ok") {
+            llmParsedOk += 1;
+          } else if (result.status === "parsed_failed") {
+            llmParsedFailed += 1;
+            llmFailed += 1;
+          } else if (result.status === "llm_error") {
+            llmErrored += 1;
+            llmFailed += 1;
+          }
+        } catch {
           llmFailed += 1;
+          llmErrored += 1;
+          remainingLlmCalls += 1;
         }
-      } catch {
-        llmFailed += 1;
-        continue;
       }
-    }
+    };
+
+    const workers = Array.from(
+      { length: Math.min(llmConcurrency, recentEvents.length) },
+      () => runWorker(),
+    );
+    await Promise.all(workers);
   }
 
   const llmTime = nowMs() - llmStart;
@@ -264,6 +326,11 @@ export const runNewsPipeline = async ({
       llm: llmTime,
       total: totalTime,
     },
+    ingestFailures: {
+      failedFeedUrls: ingestMetrics.failedFeedUrls,
+      failedFeedErrors: ingestMetrics.failedFeedErrors,
+      failedFeedStatuses: ingestMetrics.failedFeedStatuses,
+    },
     counts: {
       feedsProcessed: ingestMetrics.feedsProcessed,
       feedsFailed: ingestMetrics.feedsFailed,
@@ -276,6 +343,9 @@ export const runNewsPipeline = async ({
       llmCalls,
       llmSkipped,
       llmFailed,
+      llmParsedOk,
+      llmParsedFailed,
+      llmErrored,
     },
   };
 };
