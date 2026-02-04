@@ -38,6 +38,8 @@ model Event {
   theatres    String[]     @default([])
   lat         Float?
   lng         Float?
+  geoLabel    String?
+  geoPrecision GeoPrecision?
   output      EventOutput?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -53,8 +55,23 @@ model EventOutput {
   updatedAt DateTime @updatedAt
 }
 
+model GeoLookup {
+  query     String   @id
+  lat       Float
+  lng       Float
+  label     String
+  createdAt DateTime @default(now())
+}
+
 enum Severity {
   low
   medium
   high
+}
+
+enum GeoPrecision {
+  country
+  city
+  region
+  unknown
 }

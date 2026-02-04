@@ -36,7 +36,26 @@ type AlertsPanelProps = {
   onClose: () => void;
 };
 
-type AlertArrayField = 'countries' | 'categories' | 'threat_levels';
+type AlertArrayFields = {
+  [Key in keyof AlertFormData as AlertFormData[Key] extends Array<unknown>
+    ? Key
+    : never]: AlertFormData[Key];
+};
+type AlertArrayField = keyof AlertArrayFields;
+type AlertArrayItem<Field extends AlertArrayField> =
+  AlertArrayFields[Field][number];
+
+const toggleInArray = <Field extends AlertArrayField>(
+  prev: AlertFormData,
+  field: Field,
+  item: AlertArrayItem<Field>
+): AlertFormData => {
+  const values = prev[field];
+  const filtered = values.filter(value => value !== item);
+  const nextValues =
+    filtered.length !== values.length ? filtered : [...values, item];
+  return { ...prev, [field]: nextValues };
+};
 
 export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
   const [isCreating, setIsCreating] = useState(false);
@@ -145,13 +164,11 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
     }));
   };
 
-  const toggleArrayItem = (field: AlertArrayField, item: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].includes(item)
-        ? prev[field].filter(i => i !== item)
-        : [...prev[field], item]
-    }));
+  const toggleArrayItem = <Field extends AlertArrayField>(
+    field: Field,
+    item: AlertArrayItem<Field>
+  ) => {
+    setFormData(prev => toggleInArray(prev, field, item));
   };
 
   return (

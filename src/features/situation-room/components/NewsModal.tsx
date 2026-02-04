@@ -4,7 +4,7 @@ import { X, MapPin, Clock, Shield, BookOpen, Loader2, ChevronDown, ChevronUp } f
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { situationService } from '../services/situationService';
-import type { HistoricalContext, NewsItem } from '../domain/types';
+import type { HistoricalContext, NewsCategory, NewsItem, ThreatLevel } from '../domain/types';
 
 type NewsModalProps = {
   news: NewsItem | null;
@@ -48,7 +48,7 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
     }
   };
 
-  const getThreatColor = (level) => {
+  const getThreatColor = (level?: ThreatLevel | null) => {
     switch (level?.toLowerCase()) {
       case 'critical': return 'bg-red-500/20 text-red-400 border-red-500';
       case 'high': return 'bg-orange-500/20 text-orange-400 border-orange-500';
@@ -57,7 +57,7 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
     }
   };
 
-  const getThreatBgColor = (level) => {
+  const getThreatBgColor = (level?: ThreatLevel | null) => {
     switch (level?.toLowerCase()) {
       case 'critical': return 'from-red-900/20';
       case 'high': return 'from-orange-900/20';
@@ -66,7 +66,7 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
     }
   };
 
-  const getCategoryIcon = (category) => {
+  const getCategoryIcon = (category?: NewsCategory | null) => {
     switch (category?.toLowerCase()) {
       case 'conflict': return '⚔️';
       case 'nuclear': return '☢️';
@@ -197,6 +197,11 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
                         </p>
                       ) : historicalContext ? (
                         <div className="space-y-4">
+                          {(() => {
+                            const keyDates = historicalContext.key_dates ?? [];
+                            const keyFigures = historicalContext.key_figures ?? [];
+                            return (
+                              <>
                           {historicalContext.title && (
                             <h3 className="text-sm font-bold text-amber-400">{historicalContext.title}</h3>
                           )}
@@ -205,11 +210,11 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
                             {historicalContext.context}
                           </p>
 
-                          {historicalContext.key_dates?.length > 0 && (
+                          {keyDates.length > 0 && (
                             <div className="mt-4">
                               <span className="text-[10px] text-amber-600 tracking-wider font-bold block mb-2">KEY DATES</span>
                               <div className="space-y-2">
-                                {historicalContext.key_dates.map((item, idx) => (
+                                {keyDates.map((item, idx) => (
                                   <div key={idx} className="flex gap-3 text-xs">
                                     <span className="text-amber-400 font-mono font-bold min-w-[60px]">{item.year}</span>
                                     <span className="text-gray-400">{item.event}</span>
@@ -219,11 +224,11 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
                             </div>
                           )}
 
-                          {historicalContext.key_figures?.length > 0 && (
+                          {keyFigures.length > 0 && (
                             <div className="mt-4">
                               <span className="text-[10px] text-amber-600 tracking-wider font-bold block mb-2">KEY FIGURES</span>
                               <div className="flex flex-wrap gap-2">
-                                {historicalContext.key_figures.map((figure, idx) => (
+                                {keyFigures.map((figure, idx) => (
                                   <span key={idx} className="text-xs px-2 py-1 bg-amber-900/20 border border-amber-900/30 rounded text-amber-300">
                                     {figure}
                                   </span>
@@ -231,6 +236,9 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
                               </div>
                             </div>
                           )}
+                              </>
+                            );
+                          })()}
                         </div>
                       ) : null}
                     </div>
