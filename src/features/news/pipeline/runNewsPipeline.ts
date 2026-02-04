@@ -1,6 +1,6 @@
 "use server";
 
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { EVENT_LOOKBACK_HOURS, FEED_URLS, MAX_LLM_CALLS_PER_RUN } from "../config";
 import { ingestFeeds } from "../ingest/rss";
@@ -158,11 +158,11 @@ const fetchRelatedArticles = async (
   limit: number,
 ): Promise<RawArticleRecord[]> => {
   const countries = event.countries?.filter(Boolean) ?? [];
-  const filters =
+  const filters: Prisma.RawArticleWhereInput[] =
     countries.length > 0
-      ? countries.flatMap((country) => [
-          { title: { contains: country, mode: "insensitive" } },
-          { content: { contains: country, mode: "insensitive" } },
+      ? countries.flatMap((country): Prisma.RawArticleWhereInput[] => [
+          { title: { contains: country, mode: Prisma.QueryMode.insensitive } },
+          { content: { contains: country, mode: Prisma.QueryMode.insensitive } },
         ])
       : [];
 

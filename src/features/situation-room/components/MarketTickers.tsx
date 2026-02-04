@@ -7,12 +7,6 @@ import type { MarketTicker } from '../domain/types';
 export default function MarketTickers() {
   const [markets, setMarkets] = useState<MarketTicker[]>([]);
 
-  useEffect(() => {
-    fetchMarketData();
-    const interval = setInterval(fetchMarketData, 60000); // Refresh every minute
-    return () => clearInterval(interval);
-  }, []);
-
   const fetchMarketData = async () => {
     try {
       const data = await situationService.getMarketTickers();
@@ -21,6 +15,19 @@ export default function MarketTickers() {
       console.error('Failed to fetch market data:', error);
     }
   };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      void fetchMarketData();
+    }, 0);
+    const interval = setInterval(() => {
+      void fetchMarketData();
+    }, 60000); // Refresh every minute
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(interval);
+    };
+  }, []);
 
   const getChangeIcon = (change: number) => {
     if (change > 0) return <TrendingUp className="w-3 h-3" />;

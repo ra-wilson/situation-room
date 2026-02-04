@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 
 type EventInput = {
   id: string;
@@ -44,7 +45,7 @@ type PrismaLike = {
   eventOutput: {
     findUnique: (args: { where: { eventId: string } }) => Promise<{
       inputHash?: string | null;
-      payload?: SummaryPayload | null;
+      payload?: Prisma.JsonValue | null;
     } | null>;
     upsert: (args: {
       where: { eventId: string };
@@ -159,17 +160,23 @@ export const summariseEvent = async (
   });
 
   if (existing?.inputHash && existing.inputHash === inputHash) {
-    console.info("summariseEvent status", {
-      status: "skipped",
-      eventId: event.id,
-      inputHash,
-    });
-    return {
-      skipped: true,
-      inputHash,
-      payload: existing.payload ?? null,
-      status: "skipped",
-    };
+    const existingPayload = existing.payload ?? null;
+    const parsedExisting = existingPayload
+      ? summarySchema.safeParse(existingPayload)
+      : null;
+    if (parsedExisting?.success) {
+      console.info("summariseEvent status", {
+        status: "skipped",
+        eventId: event.id,
+        inputHash,
+      });
+      return {
+        skipped: true,
+        inputHash,
+        payload: parsedExisting.data,
+        status: "skipped",
+      };
+    }
   }
 
   const prompt = buildPrompt(event, articles);
