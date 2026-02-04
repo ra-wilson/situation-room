@@ -64,7 +64,7 @@ const summarySchema = z.object({
       const normalized = value.trim().toLowerCase();
       return normalized ? normalized : undefined;
     },
-    z.enum(["low", "medium", "high"]).default("low"),
+    z.enum(["low", "medium", "high"]),
   ),
   sources: z.array(z.string().trim().min(1)).min(1),
 });
@@ -139,13 +139,74 @@ const buildPrompt = (
     "Do not include markdown, explanation, or prose. Output JSON only.",
     "summary: 4-6 sentences, neutral, plain language.",
     "historicalContext: bulleted timeline of related historical events, 200-350 words max.",
-    "severity: low, medium, or high.",
+    "severity must be exactly one of: low | medium | high (lowercase).",
+    "Severity rubric:",
+    "- low: routine developments, rhetoric, or minor incidents without clear escalation.",
+    "- medium: meaningful escalation, significant military moves, new sanctions, or sustained clashes.",
+    "- high: major attacks, invasion, war declaration, nuclear escalation, regime change/coup, or imminent large-scale conflict.",
     "sources: array of URL strings; only URLs from the provided articles; do not invent any sources.",
     `Event context title: ${event.title ?? "(none)"}`,
     "",
     "Articles:",
     articleLines.join("\n\n"),
   ].join("\n");
+};
+
+const bumpSeverity = (
+  severity: SummaryPayload["severity"],
+  event: EventInput,
+  articles: RawArticleInput[],
+  summary: string,
+): SummaryPayload["severity"] => {
+  const text = [
+    event.title ?? "",
+    summary,
+    ...articles.map((article) => article.title ?? ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+  const mediumKeywords = [
+    "airstrike",
+    "missile",
+    "attack",
+    "strike",
+    "sanctions escalation",
+    "sanctions",
+    "taiwan",
+    "iran",
+    "israel",
+  ];
+  const highKeywords = [
+    "nuclear",
+    "war declaration",
+    "invasion",
+    "regime change",
+    "coup",
+    "war",
+    "imminent invasion",
+  ];
+  const hasMedium = mediumKeywords.some((keyword) => text.includes(keyword));
+  const hasHigh = highKeywords.some((keyword) => text.includes(keyword));
+  let nextSeverity = severity;
+
+  if (severity === "low" && (hasMedium || hasHigh)) {
+    nextSeverity = "medium";
+  }
+  if (severity === "medium" && hasHigh) {
+    nextSeverity = "high";
+  }
+
+  if (nextSeverity !== severity) {
+    console.info("summariseEvent status", {
+      status: "severity_bumped",
+      eventId: event.id,
+      from: severity,
+      to: nextSeverity,
+      reason: hasHigh ? "high_keywords" : "medium_keywords",
+    });
+  }
+
+  return nextSeverity;
 };
 
 export const summariseEvent = async (
@@ -235,7 +296,12 @@ export const summariseEvent = async (
   const payload: SummaryPayload = {
     summary: parsedResult.data.summary,
     historicalContext: parsedResult.data.historicalContext,
-    severity: parsedResult.data.severity,
+    severity: bumpSeverity(
+      parsedResult.data.severity,
+      event,
+      articles,
+      parsedResult.data.summary,
+    ),
     sources,
   };
 

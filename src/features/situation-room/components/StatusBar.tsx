@@ -25,7 +25,7 @@ export default function StatusBar({ user, onLogout, onShowAlerts }: StatusBarPro
     return () => clearInterval(interval);
   }, []);
 
-  const formatTime = (date) => {
+  const formatTime = (date: Date) => {
     return date.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
   };
 

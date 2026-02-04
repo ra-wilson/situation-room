@@ -20,6 +20,7 @@ type RawArticleRecord = {
 type EventRecord = {
   id: string;
   title?: string | null;
+  summary?: string | null;
   countries?: string[] | null;
   theatres?: string[] | null;
   lat?: number | null;
@@ -143,6 +144,7 @@ const fetchRecentEvents = async (
     select: {
       id: true,
       title: true,
+      summary: true,
       countries: true,
       theatres: true,
       lat: true,
