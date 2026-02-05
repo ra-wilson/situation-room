@@ -1,0 +1,56 @@
+name: Refresh fast
+
+on:
+  schedule:
+    # GitHub Actions minimum frequency is every 5 minutes.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: refresh-fast
+  cancel-in-progress: true
+
+jobs:
+  markets:
+    name: Refresh markets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call markets refresh
+        env:
+          BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          url="${BASE_URL}/api/markets/refresh"
+          tmp=$(mktemp)
+          code=$(curl -sS -w "%{http_code}" -o "$tmp" --retry 3 --retry-delay 5 \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            -X POST "$url")
+          echo "HTTP $code"
+          cat "$tmp"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "Request failed: $url" >&2
+            exit 1
+          fi
+
+  polymarket:
+    name: Refresh polymarket
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call polymarket refresh
+        env:
+          BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          url="${BASE_URL}/api/polymarket/refresh"
+          tmp=$(mktemp)
+          code=$(curl -sS -w "%{http_code}" -o "$tmp" --retry 3 --retry-delay 5 \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            -X POST "$url")
+          echo "HTTP $code"
+          cat "$tmp"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "Request failed: $url" >&2
+            exit 1
+          fi
