@@ -34,6 +34,7 @@ const THREAT_LEVELS: ThreatLevel[] = ['critical', 'high', 'moderate', 'low'];
 type AlertsPanelProps = {
   isOpen: boolean;
   onClose: () => void;
+  canManageAlerts?: boolean;
 };
 
 type AlertArrayFields = {
@@ -57,7 +58,7 @@ const toggleInArray = <Field extends AlertArrayField>(
   return { ...prev, [field]: nextValues };
 };
 
-export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
+export default function AlertsPanel({ isOpen, onClose, canManageAlerts = false }: AlertsPanelProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingAlert, setEditingAlert] = useState<Alert | null>(null);
   const [formData, setFormData] = useState<AlertFormData>({
@@ -117,6 +118,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
   };
 
   const handleSubmit = () => {
+    if (!canManageAlerts) return;
     if (!formData.name.trim()) return;
 
     if (editingAlert) {
@@ -127,6 +129,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
   };
 
   const handleEdit = (alert: Alert) => {
+    if (!canManageAlerts) return;
     setEditingAlert(alert);
     setFormData({
       name: alert.name || '',
@@ -141,6 +144,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
   };
 
   const toggleActive = (alert: Alert) => {
+    if (!canManageAlerts) return;
     updateMutation.mutate({
       id: alert.id,
       data: { is_active: !alert.is_active }
@@ -148,6 +152,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
   };
 
   const addKeyword = () => {
+    if (!canManageAlerts) return;
     if (keywordInput.trim() && !formData.keywords.includes(keywordInput.trim())) {
       setFormData(prev => ({
         ...prev,
@@ -158,6 +163,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
   };
 
   const removeKeyword = (keyword: string) => {
+    if (!canManageAlerts) return;
     setFormData(prev => ({
       ...prev,
       keywords: prev.keywords.filter(k => k !== keyword)
@@ -168,6 +174,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
     field: Field,
     item: AlertArrayItem<Field>
   ) => {
+    if (!canManageAlerts) return;
     setFormData(prev => toggleInArray(prev, field, item));
   };
 
@@ -182,6 +189,11 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
         </DialogHeader>
 
         <div className="space-y-4">
+          {!canManageAlerts && (
+            <div className="p-3 text-[11px] text-amber-300 border border-amber-900/40 bg-amber-950/20 rounded">
+              Sign in to create, edit, or delete alerts.
+            </div>
+          )}
           {/* Create/Edit Form */}
           {isCreating ? (
             <div className="p-4 bg-[#111] border border-cyan-900/30 rounded-lg space-y-4">
@@ -201,6 +213,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g., Middle East Conflict Watch"
+                  disabled={!canManageAlerts}
                   className="bg-[#0a0a0a] border-cyan-900/30 text-white"
                 />
               </div>
@@ -212,12 +225,13 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                   {COUNTRIES.map(country => (
                     <button
                       key={country}
+                      disabled={!canManageAlerts}
                       onClick={() => toggleArrayItem('countries', country)}
                       className={`text-[10px] px-2 py-1 rounded border transition-colors ${
                         formData.countries.includes(country)
                           ? 'bg-cyan-900/30 border-cyan-500 text-cyan-400'
                           : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'
-                      }`}
+                      } ${!canManageAlerts ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {country}
                     </button>
@@ -232,12 +246,13 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                   {CATEGORIES.map(cat => (
                     <button
                       key={cat}
+                      disabled={!canManageAlerts}
                       onClick={() => toggleArrayItem('categories', cat)}
                       className={`text-[10px] px-2 py-1 rounded border capitalize transition-colors ${
                         formData.categories.includes(cat)
                           ? 'bg-amber-900/30 border-amber-500 text-amber-400'
                           : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'
-                      }`}
+                      } ${!canManageAlerts ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       {cat}
                     </button>
@@ -259,12 +274,13 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                     return (
                       <button
                         key={level}
+                        disabled={!canManageAlerts}
                         onClick={() => toggleArrayItem('threat_levels', level)}
                         className={`text-[10px] px-2 py-1 rounded border capitalize transition-colors ${
                           formData.threat_levels.includes(level)
                             ? colors[level]
                             : 'bg-[#0a0a0a] border-gray-700 text-gray-400 hover:border-gray-500'
-                        }`}
+                        } ${!canManageAlerts ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {level}
                       </button>
@@ -283,8 +299,9 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                     placeholder="Add keyword..."
                     className="bg-[#0a0a0a] border-cyan-900/30 text-white text-sm"
                     onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
+                    disabled={!canManageAlerts}
                   />
-                  <Button onClick={addKeyword} size="sm" className="bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400">
+                  <Button onClick={addKeyword} size="sm" className="bg-cyan-900/30 hover:bg-cyan-900/50 text-cyan-400" disabled={!canManageAlerts}>
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
@@ -292,7 +309,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                   {formData.keywords.map(keyword => (
                     <span key={keyword} className="text-[10px] px-2 py-1 bg-purple-900/30 border border-purple-500/50 text-purple-400 rounded flex items-center gap-1">
                       {keyword}
-                      <button onClick={() => removeKeyword(keyword)} className="hover:text-white">
+                      <button onClick={() => removeKeyword(keyword)} className="hover:text-white" disabled={!canManageAlerts}>
                         <X className="w-3 h-3" />
                       </button>
                     </span>
@@ -305,7 +322,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                 <Button onClick={resetForm} variant="ghost" className="text-gray-400">
                   Cancel
                 </Button>
-                <Button onClick={handleSubmit} className="bg-cyan-600 hover:bg-cyan-700">
+                <Button onClick={handleSubmit} className="bg-cyan-600 hover:bg-cyan-700" disabled={!canManageAlerts}>
                   <Check className="w-4 h-4 mr-2" />
                   {editingAlert ? 'Update Alert' : 'Create Alert'}
                 </Button>
@@ -313,7 +330,8 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
             </div>
           ) : (
             <Button
-              onClick={() => setIsCreating(true)}
+              onClick={() => canManageAlerts && setIsCreating(true)}
+              disabled={!canManageAlerts}
               className="w-full bg-cyan-900/20 border border-cyan-900/30 text-cyan-400 hover:bg-cyan-900/30"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -385,6 +403,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleActive(alert)}
+                        disabled={!canManageAlerts}
                         className="h-8 w-8 p-0 text-gray-400 hover:text-white"
                       >
                         {alert.is_active ? (
@@ -397,6 +416,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEdit(alert)}
+                        disabled={!canManageAlerts}
                         className="h-8 w-8 p-0 text-gray-400 hover:text-white"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -405,6 +425,7 @@ export default function AlertsPanel({ isOpen, onClose }: AlertsPanelProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => deleteMutation.mutate(alert.id)}
+                        disabled={!canManageAlerts}
                         className="h-8 w-8 p-0 text-gray-400 hover:text-red-400"
                       >
                         <Trash2 className="w-4 h-4" />

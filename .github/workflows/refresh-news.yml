@@ -1,0 +1,33 @@
+name: Refresh news
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: refresh-news
+  cancel-in-progress: true
+
+jobs:
+  news:
+    name: Run news pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call news pipeline
+        env:
+          BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          url="${BASE_URL}/api/news/pipeline"
+          tmp=$(mktemp)
+          code=$(curl -sS -w "%{http_code}" -o "$tmp" --retry 3 --retry-delay 5 \
+            -H "x-cron-secret: ${CRON_SECRET}" \
+            -X POST "$url")
+          echo "HTTP $code"
+          cat "$tmp"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "Request failed: $url" >&2
+            exit 1
+          fi
