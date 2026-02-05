@@ -1,7 +1,7 @@
 'use client';
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import GlobeMap from '../components/GlobeMap';
@@ -14,6 +14,8 @@ import AlertsPanel from '../components/AlertsPanel';
 import { authClient } from '../data/authClient';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { NewsItem, User as SituationUser } from '../domain/types';
+import AuthButton from '@/src/components/auth/AuthButton';
+import { signOut, useSession } from 'next-auth/react';
 
 export default function SituationMonitor() {
   const [queryClient] = useState(() => new QueryClient());
@@ -24,6 +26,10 @@ export default function SituationMonitor() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const { data: session, status } = useSession();
+  const isSessionAuthenticated = status === 'authenticated';
+  const isSessionLoading = status === 'loading';
+  const isDevAccess = process.env.NODE_ENV !== 'production';
 
   useEffect(() => {
     checkAuth();
@@ -44,6 +50,19 @@ export default function SituationMonitor() {
     }
   };
 
+  const sessionUser = useMemo<SituationUser | null>(() => {
+    if (!session?.user) return null;
+    return {
+      id: session.user.email ?? 'session-user',
+      full_name: session.user.name ?? undefined,
+      email: session.user.email ?? undefined,
+      role: 'user',
+    };
+  }, [session]);
+
+  const canAccessApp = isAuthenticated || isSessionAuthenticated;
+  const activeUser = sessionUser ?? user;
+
   const handleLogin = async () => {
     const loggedInUser = await authClient.login();
     setUser(loggedInUser);
@@ -51,12 +70,16 @@ export default function SituationMonitor() {
   };
 
   const handleLogout = async () => {
+    if (isSessionAuthenticated) {
+      await signOut();
+      return;
+    }
     await authClient.logout();
     setUser(null);
     setIsAuthenticated(false);
   };
 
-  if (isCheckingAuth) {
+  if (isCheckingAuth || isSessionLoading) {
     return (
       <QueryClientProvider client={queryClient}>
         <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
@@ -69,7 +92,7 @@ export default function SituationMonitor() {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!canAccessApp) {
     return (
       <QueryClientProvider client={queryClient}>
         <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center relative overflow-hidden">
@@ -107,13 +130,19 @@ export default function SituationMonitor() {
                 </p>
               </div>
 
-              <Button
-                onClick={handleLogin}
-                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3"
-              >
-                <User className="w-4 h-4 mr-2" />
-                AUTHENTICATE
-              </Button>
+              {isDevAccess && (
+                <Button
+                  onClick={handleLogin}
+                  className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  DEV ACCESS (LOCAL)
+                </Button>
+              )}
+
+              <div className="mt-4">
+                <AuthButton />
+              </div>
 
               <p className="text-[10px] text-gray-600 mt-4 tracking-wider">
                 ENCRYPTED CONNECTION • TLS 1.3
@@ -150,7 +179,7 @@ export default function SituationMonitor() {
         />
 
         {/* Status Bar */}
-        <StatusBar user={user} onLogout={handleLogout} onShowAlerts={() => setShowAlerts(true)} />
+        <StatusBar user={activeUser} onLogout={handleLogout} onShowAlerts={() => setShowAlerts(true)} />
 
         {/* Market Tickers */}
         <MarketTickers />
@@ -191,7 +220,11 @@ export default function SituationMonitor() {
         )}
 
         {/* Alerts Panel */}
-        <AlertsPanel isOpen={showAlerts} onClose={() => setShowAlerts(false)} />
+        <AlertsPanel
+          isOpen={showAlerts}
+          onClose={() => setShowAlerts(false)}
+          canManageAlerts={canAccessApp}
+        />
       </div>
     </QueryClientProvider>
   );

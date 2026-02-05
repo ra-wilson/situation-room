@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 
 import { runNewsPipeline } from "@/src/features/news/pipeline/runNewsPipeline";
 import { prisma } from "@/src/lib/db";
+import { buildCronUnauthorized, isCronAuthorized } from "@/src/lib/cron-auth";
+import { runWithCronGuard } from "@/src/lib/cron-guard";
 
-const getPipelineSecret = (): string => process.env.PIPELINE_SECRET ?? "";
-
-const buildUnauthorized = () =>
-  NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const NEWS_GUARD_KEY = "news-pipeline";
+const NEWS_GUARD_TTL_MS = 10 * 60 * 1000;
 
 const buildLlmClient = () => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -33,14 +33,22 @@ const buildLlmClient = () => {
 };
 
 export async function POST(request: Request) {
-  const provided = request.headers.get("x-pipeline-secret") ?? "";
-  const expected = getPipelineSecret();
-
-  if (!expected || provided !== expected) {
-    return buildUnauthorized();
+  if (!isCronAuthorized(request, { allowPipelineSecret: true })) {
+    return buildCronUnauthorized();
   }
 
-  const llm = buildLlmClient();
-  const metrics = await runNewsPipeline({ prisma, llm: llm ?? undefined });
-  return NextResponse.json({ llmEnabled: Boolean(llm), metrics });
+  const guarded = await runWithCronGuard(NEWS_GUARD_KEY, NEWS_GUARD_TTL_MS, async () => {
+    const llm = buildLlmClient();
+    const metrics = await runNewsPipeline({ prisma, llm: llm ?? undefined });
+    return { llmEnabled: Boolean(llm), metrics };
+  });
+
+  if (guarded.skipped) {
+    return NextResponse.json(
+      { error: "Refresh already running" },
+      { status: 409 },
+    );
+  }
+
+  return NextResponse.json(guarded.result);
 }

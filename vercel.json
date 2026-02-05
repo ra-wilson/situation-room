@@ -1,0 +1,19 @@
+{
+  "crons": [
+    {
+      "path": "/api/markets/refresh",
+      "schedule": "*/2 * * * *",
+      "method": "POST"
+    },
+    {
+      "path": "/api/news/pipeline",
+      "schedule": "*/10 * * * *",
+      "method": "POST"
+    },
+    {
+      "path": "/api/polymarket/refresh",
+      "schedule": "*/5 * * * *",
+      "method": "POST"
+    }
+  ]
+}

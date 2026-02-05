@@ -1,0 +1,89 @@
+{
+  "updatedAt": "2026-02-05T11:07:50.411Z",
+  "data": [
+    {
+      "symbol": "EUR",
+      "name": "EUR/USD",
+      "value": "—",
+      "change": 0,
+      "ok": false
+    },
+    {
+      "symbol": "GBP",
+      "name": "GBP/USD",
+      "value": "—",
+      "change": 0,
+      "ok": false
+    },
+    {
+      "symbol": "JPY",
+      "name": "USD/JPY",
+      "value": "—",
+      "change": 0,
+      "ok": false
+    },
+    {
+      "symbol": "CNH",
+      "name": "USD/CNH",
+      "value": "—",
+      "change": 0,
+      "ok": false
+    },
+    {
+      "symbol": "XAU",
+      "name": "Gold",
+      "value": "—",
+      "change": 0,
+      "ok": false
+    },
+    {
+      "symbol": "WTI",
+      "name": "WTI Crude",
+      "value": "—",
+      "change": 0,
+      "ok": false
+    },
+    {
+      "symbol": "BRENT",
+      "name": "Brent Crude",
+      "value": "—",
+      "change": 0,
+      "ok": false
+    },
+    {
+      "symbol": "SPY",
+      "name": "SPY",
+      "value": "$686.19",
+      "change": -0.6025928876656722,
+      "ok": true
+    },
+    {
+      "symbol": "QQQ",
+      "name": "QQQ",
+      "value": "$605.75",
+      "change": -1.5072680563233687,
+      "ok": true
+    },
+    {
+      "symbol": "TLT",
+      "name": "TLT",
+      "value": "$86.54",
+      "change": -0.10389010735309848,
+      "ok": true
+    },
+    {
+      "symbol": "VIXY",
+      "name": "VIXY",
+      "value": "$26.75",
+      "change": 2.0213577421815456,
+      "ok": true
+    },
+    {
+      "symbol": "DIA",
+      "name": "DIA",
+      "value": "$494.75",
+      "change": 0.16804340783932298,
+      "ok": true
+    }
+  ]
+}
