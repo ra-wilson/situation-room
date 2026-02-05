@@ -9,15 +9,12 @@ import NewsModal from '../components/NewsModal';
 import StatusBar from '../components/StatusBar';
 import AlertsPanel from '../components/AlertsPanel';
 import { authClient } from '../data/authClient';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { NewsItem, User as SituationUser } from '../domain/types';
 import { signIn, signOut, useSession } from 'next-auth/react';
 
 export default function SituationMonitor() {
-  const [queryClient] = useState(() => new QueryClient());
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [newsData, setNewsData] = useState<NewsItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<SituationUser | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showAlerts, setShowAlerts] = useState(false);
@@ -83,7 +80,6 @@ export default function SituationMonitor() {
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
       <div className="min-h-screen bg-[#0a0a0a] text-white font-mono relative overflow-y-auto xl:overflow-hidden">
         {/* Scan line effect overlay */}
         <div className="pointer-events-none fixed inset-0 z-50 opacity-[0.03]" 
@@ -120,8 +116,6 @@ export default function SituationMonitor() {
               onSelectNews={setSelectedNews} 
               newsData={newsData}
               setNewsData={setNewsData}
-              isLoading={isLoading}
-              setIsLoading={setIsLoading}
             />
           </div>
 
@@ -154,6 +148,5 @@ export default function SituationMonitor() {
           canManageAlerts={canManageAlerts}
         />
       </div>
-    </QueryClientProvider>
   );
 }

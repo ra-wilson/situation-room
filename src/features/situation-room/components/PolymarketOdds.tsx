@@ -1,38 +1,44 @@
 'use client';
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, BarChart3, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React, { useEffect, useCallback } from 'react';
+import { TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
 import type { PredictionMarket } from '../domain/types';
+import { useSnapshotFetch } from '../hooks/useSnapshotFetch';
+import { useRenderGuard } from '../hooks/useRenderGuard';
 
 export default function PolymarketOdds() {
-  const [odds, setOdds] = useState<PredictionMarket[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetchOdds();
-  }, []);
-
-  const fetchOdds = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch("/api/polymarket");
+  console.count('PolymarketPanel render');
+  const { tripped } = useRenderGuard('PolymarketPanel');
+  const { data: odds, isLoading, error, fetchSnapshot, cancel } = useSnapshotFetch<PredictionMarket[]>(
+    async (signal) => {
+      const res = await fetch('/api/polymarket', { signal });
       if (!res.ok) {
-        throw new Error("Failed to load polymarket");
+        throw new Error('Failed to load polymarket');
       }
       const payload = (await res.json()) as { data?: unknown } | PredictionMarket[] | null;
       if (Array.isArray(payload)) {
-        setOdds(payload);
-      } else if (payload && Array.isArray(payload.data)) {
-        setOdds(payload.data as PredictionMarket[]);
-      } else {
-        setOdds([]);
+        return payload;
       }
-    } catch (error) {
-      console.error('Failed to fetch odds:', error);
-    } finally {
-      setIsLoading(false);
+      if (payload && Array.isArray(payload.data)) {
+        return payload.data as PredictionMarket[];
+      }
+      return [];
+    },
+    { enabled: !tripped }
+  );
+
+  useEffect(() => {
+    // Intentionally fetch once on mount. Freshness is managed server-side (cron + revalidate).
+    if (!tripped) {
+      void fetchSnapshot();
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (tripped) {
+      cancel();
+    }
+  }, [tripped, cancel]);
 
   const getTrendIcon = (trend: PredictionMarket["trend"] | undefined) => {
     if (trend === 'up') return <TrendingUp className="w-3 h-3 text-green-400" />;
@@ -67,15 +73,6 @@ export default function PolymarketOdds() {
             <BarChart3 className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-bold tracking-wider text-cyan-400">PREDICTION MARKETS</span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={fetchOdds}
-            disabled={isLoading}
-            className="h-6 px-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/20"
-          >
-            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
@@ -85,16 +82,25 @@ export default function PolymarketOdds() {
 
       {/* Odds List */}
       <div className="flex-1 overflow-y-auto custom-scrollbar market-scrollbar">
-        {isLoading ? (
+        {tripped ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+            <span className="text-[10px] text-red-400 tracking-wider">LIVE DATA TEMPORARILY UNAVAILABLE</span>
+          </div>
+        ) : isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
             <span className="text-[10px] text-amber-600 tracking-wider">CALCULATING PROBABILITIES...</span>
           </div>
-        ) : (
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+            <span className="text-[10px] text-red-400 tracking-wider">FAILED TO LOAD ODDS</span>
+            <span className="text-[9px] text-gray-600">{error}</span>
+          </div>
+        ) : odds && odds.length > 0 ? (
           <div className="p-2 pr-3 space-y-2">
             {odds.map((item, index) => (
               <div
-                key={index}
+                key={`${item.question}-${index}`}
                 className="p-3 bg-[#111]/50 border border-cyan-900/20 rounded hover:border-amber-500/30 transition-all"
               >
                 <div className="flex items-start justify-between gap-2 mb-2">
@@ -135,6 +141,10 @@ export default function PolymarketOdds() {
                 )}
               </div>
             ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-[10px] text-gray-500 tracking-wider">
+            NO MARKET ODDS
           </div>
         )}
       </div>

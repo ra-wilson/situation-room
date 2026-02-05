@@ -77,3 +77,4 @@ DIRECT_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres"
 - Grounded AI: summaries are generated only from ingested articles, not from open-ended “what’s happening today” prompts.
 - Batch processing: pipeline runs on demand (and can be scheduled) rather than streaming, for predictable cost and simplicity.
 - Metrics-first pipeline: each stage reports timings, counts, and failures for observability.
+- Data freshness model: the client loads a snapshot once on mount. Freshness is handled server-side (cron + revalidation). There is no client polling, no focus refresh, and no time-driven UI updates.

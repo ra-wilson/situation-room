@@ -1,23 +1,39 @@
 'use client';
-import React, { useEffect } from 'react';
-import { MapPin, RefreshCw, Zap } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { situationService } from '../services/situationService';
+import React, { useEffect, useRef, useState } from 'react';
+import { MapPin, Zap } from 'lucide-react';
 import type { NewsCategory, NewsItem, ThreatLevel } from '../domain/types';
+import { useRenderGuard } from '../hooks/useRenderGuard';
 
 type NewsFeedProps = {
   onSelectNews: (news: NewsItem) => void;
   newsData: NewsItem[];
   setNewsData: React.Dispatch<React.SetStateAction<NewsItem[]>>;
-  isLoading: boolean;
-  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
 };
 
-export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoading, setIsLoading }: NewsFeedProps) {
+export default function NewsFeed({ onSelectNews, newsData, setNewsData }: NewsFeedProps) {
+  console.count('NewsPanel render');
+  const { tripped } = useRenderGuard('NewsPanel');
+  const inFlightRef = useRef(false);
+  const controllerRef = useRef<AbortController | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
-    fetchNews();
+    // Intentionally fetch once on mount. Freshness is managed server-side (cron + revalidate).
+    if (!tripped) {
+      void fetchNews();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!tripped) return;
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    inFlightRef.current = false;
+    setIsLoading(false);
+    setError('Live data temporarily unavailable');
+  }, [tripped]);
 
   const toNumber = (value: unknown): number | null => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -122,15 +138,32 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
   };
 
   const fetchNews = async () => {
+    if (tripped) return;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setIsLoading(true);
+    setError(null);
     try {
-      const news = await situationService.getNews();
+      const res = await fetch('/api/news/events', { signal: controller.signal });
+      if (!res.ok) {
+        throw new Error('Failed to load news');
+      }
+      const news = (await res.json()) as unknown[];
       const normalized = news.map((item, index) => normalizeNewsItem(item, index));
       setNewsData(normalized);
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
       console.error('Failed to fetch news:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error');
+      setNewsData([]);
     } finally {
       setIsLoading(false);
+      inFlightRef.current = false;
     }
   };
 
@@ -163,15 +196,6 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
             <Zap className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-bold tracking-wider text-cyan-400">INTELLIGENCE FEED</span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={fetchNews}
-            disabled={isLoading}
-            className="h-6 px-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/20"
-          >
-            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
-          </Button>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -181,14 +205,28 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
 
       {/* News Items */}
       <div className="flex-1 overflow-y-auto custom-scrollbar news-scrollbar">
-        {isLoading ? (
+        {tripped ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+            <span className="text-[10px] text-red-400 tracking-wider">LIVE DATA TEMPORARILY UNAVAILABLE</span>
+          </div>
+        ) : isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
             <span className="text-[10px] text-cyan-600 tracking-wider">ANALYZING GLOBAL INTEL...</span>
           </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+            <span className="text-[10px] text-red-400 tracking-wider">FAILED TO LOAD INTEL</span>
+            <span className="text-[9px] text-gray-600">{error}</span>
+          </div>
+        ) : newsData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-center">
+            <span className="text-[10px] text-gray-500 tracking-wider">NO INTEL REPORTS</span>
+            <span className="text-[9px] text-gray-600">Awaiting new signals.</span>
+          </div>
         ) : (
           <div className="p-2 space-y-2">
-            {newsData.map((news, index) => (
+            {newsData.map((news) => (
               <button
                 key={news.id}
                 onClick={() => onSelectNews(news)}

@@ -14,8 +14,8 @@ type PolymarketSnapshotPayload = {
 };
 
 type PolymarketResponseMeta = {
-  status: "ok" | "empty";
-  reason: "snapshot_not_available" | null;
+  status: "ok" | "empty" | "error";
+  reason: "snapshot_not_available" | "snapshot_fetch_failed" | null;
   lastUpdated: string | null;
   source: PolymarketSnapshotPayload["meta"]["source"];
   generatedAt: string | null;
@@ -31,42 +31,54 @@ const buildHeaders = (meta: PolymarketSnapshotPayload["meta"]) =>
   });
 
 export async function GET() {
-  const snapshot = await prisma.polymarketSnapshot.findFirst({
-    orderBy: { createdAt: "desc" },
-  });
+  try {
+    const snapshot = await prisma.polymarketSnapshot.findFirst({
+      orderBy: { createdAt: "desc" },
+    });
 
-  if (!snapshot) {
+    if (!snapshot) {
+      const meta: PolymarketResponseMeta = {
+        status: "empty",
+        reason: "snapshot_not_available",
+        lastUpdated: null,
+        source: "watchlist",
+        generatedAt: null,
+        missingCount: 0,
+      };
+
+      return NextResponse.json({ data: [], meta });
+    }
+
+    const payload = snapshot.payload as PolymarketSnapshotPayload | null;
+    const payloadMeta = payload?.meta ?? {
+      source: "watchlist" as const,
+      generatedAt: snapshot.createdAt.toISOString(),
+      missingCount: 0,
+    };
     const meta: PolymarketResponseMeta = {
-      status: "empty",
-      reason: "snapshot_not_available",
+      status: "ok",
+      reason: null,
+      lastUpdated: snapshot.createdAt.toISOString(),
+      source: payloadMeta.source,
+      generatedAt: payloadMeta.generatedAt,
+      missingCount: payloadMeta.missingCount,
+    };
+
+    return NextResponse.json(
+      { data: payload?.data ?? [], meta },
+      {
+        headers: buildHeaders(payloadMeta),
+      },
+    );
+  } catch {
+    const meta: PolymarketResponseMeta = {
+      status: "error",
+      reason: "snapshot_fetch_failed",
       lastUpdated: null,
       source: "watchlist",
       generatedAt: null,
       missingCount: 0,
     };
-
     return NextResponse.json({ data: [], meta });
   }
-
-  const payload = snapshot.payload as PolymarketSnapshotPayload | null;
-  const payloadMeta = payload?.meta ?? {
-    source: "watchlist" as const,
-    generatedAt: snapshot.createdAt.toISOString(),
-    missingCount: 0,
-  };
-  const meta: PolymarketResponseMeta = {
-    status: "ok",
-    reason: null,
-    lastUpdated: snapshot.createdAt.toISOString(),
-    source: payloadMeta.source,
-    generatedAt: payloadMeta.generatedAt,
-    missingCount: payloadMeta.missingCount,
-  };
-
-  return NextResponse.json(
-    { data: payload?.data ?? [], meta },
-    {
-      headers: buildHeaders(payloadMeta),
-    },
-  );
 }
