@@ -76,7 +76,8 @@ export default function AlertsPanel({ isOpen, onClose, canManageAlerts = false }
 
   const { data: alerts = [], isLoading } = useQuery<Alert[]>({
     queryKey: ['alerts'],
-    queryFn: () => alertsClient.list()
+    queryFn: () => alertsClient.list(),
+    enabled: canManageAlerts
   });
 
   const createMutation = useMutation<Alert, Error, AlertFormData>({
