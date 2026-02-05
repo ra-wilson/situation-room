@@ -19,8 +19,14 @@ export default function PolymarketOdds() {
       if (!res.ok) {
         throw new Error("Failed to load polymarket");
       }
-      const data = (await res.json()) as PredictionMarket[];
-      setOdds(data);
+      const payload = (await res.json()) as { data?: unknown } | PredictionMarket[] | null;
+      if (Array.isArray(payload)) {
+        setOdds(payload);
+      } else if (payload && Array.isArray(payload.data)) {
+        setOdds(payload.data as PredictionMarket[]);
+      } else {
+        setOdds([]);
+      }
     } catch (error) {
       console.error('Failed to fetch odds:', error);
     } finally {

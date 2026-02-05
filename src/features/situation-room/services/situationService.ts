@@ -15,7 +15,10 @@ export const situationService = {
     if (!USE_API) return getMockMarkets();
     const res = await fetch("/api/markets");
     if (!res.ok) throw new Error("Failed to load markets");
-    return res.json();
+    const payload = (await res.json()) as { data?: unknown } | MarketTicker[] | null;
+    if (Array.isArray(payload)) return payload;
+    if (payload && Array.isArray(payload.data)) return payload.data as MarketTicker[];
+    return [];
   },
 
   async getPredictionMarkets(): Promise<PredictionMarket[]> {

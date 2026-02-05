@@ -270,7 +270,7 @@ export default function NewsModal({ news, onClose }: NewsModalProps) {
             )}
 
             {/* Coordinates */}
-            {(news.lat !== undefined && news.lng !== undefined) && (
+            {(Number.isFinite(news.lat) && Number.isFinite(news.lng)) && (
               <div className="flex items-center gap-4 text-[10px] text-gray-500 font-mono">
                 <span>LAT: {news.lat?.toFixed(4)}°</span>
                 <span>LNG: {news.lng?.toFixed(4)}°</span>
