@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Bell, Plus, X, Trash2, Edit2, Check, ToggleLeft, ToggleRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -72,36 +71,36 @@ export default function AlertsPanel({ isOpen, onClose, canManageAlerts = false }
   });
   const [keywordInput, setKeywordInput] = useState('');
 
-  const queryClient = useQueryClient();
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: alerts = [], isLoading } = useQuery<Alert[]>({
-    queryKey: ['alerts'],
-    queryFn: () => alertsClient.list(),
-    enabled: canManageAlerts
-  });
-
-  const createMutation = useMutation<Alert, Error, AlertFormData>({
-    mutationFn: (data) => alertsClient.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
-      resetForm();
+  const loadAlerts = useCallback(async () => {
+    if (!canManageAlerts) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      const list = await alertsClient.list();
+      setAlerts(list);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+      setAlerts([]);
+    } finally {
+      setIsLoading(false);
     }
-  });
+  }, [canManageAlerts]);
 
-  const updateMutation = useMutation<Alert, Error, { id: string; data: Partial<AlertFormData> }>({
-    mutationFn: ({ id, data }) => alertsClient.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
-      resetForm();
+  useEffect(() => {
+    if (!canManageAlerts) {
+      setAlerts([]);
+      setIsLoading(false);
+      setError(null);
+      return;
     }
-  });
-
-  const deleteMutation = useMutation<void, Error, string>({
-    mutationFn: (id) => alertsClient.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] });
-    }
-  });
+    // Intentional: no background refresh or polling. Alerts load once per access.
+    void loadAlerts();
+  }, [canManageAlerts, loadAlerts]);
 
   const resetForm = () => {
     setFormData({
@@ -123,10 +122,29 @@ export default function AlertsPanel({ isOpen, onClose, canManageAlerts = false }
     if (!formData.name.trim()) return;
 
     if (editingAlert) {
-      updateMutation.mutate({ id: editingAlert.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
+      void (async () => {
+        try {
+          const updated = await alertsClient.update(editingAlert.id, formData);
+          setAlerts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+          resetForm();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Unknown error';
+          setError(message);
+        }
+      })();
+      return;
     }
+
+    void (async () => {
+      try {
+        const created = await alertsClient.create(formData);
+        setAlerts((prev) => [created, ...prev]);
+        resetForm();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setError(message);
+      }
+    })();
   };
 
   const handleEdit = (alert: Alert) => {
@@ -146,10 +164,15 @@ export default function AlertsPanel({ isOpen, onClose, canManageAlerts = false }
 
   const toggleActive = (alert: Alert) => {
     if (!canManageAlerts) return;
-    updateMutation.mutate({
-      id: alert.id,
-      data: { is_active: !alert.is_active }
-    });
+    void (async () => {
+      try {
+        const updated = await alertsClient.update(alert.id, { is_active: !alert.is_active });
+        setAlerts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setError(message);
+      }
+    })();
   };
 
   const addKeyword = () => {
@@ -346,6 +369,8 @@ export default function AlertsPanel({ isOpen, onClose, canManageAlerts = false }
             
             {isLoading ? (
               <div className="text-center py-8 text-gray-500 text-sm">Loading alerts...</div>
+            ) : error ? (
+              <div className="text-center py-8 text-red-400 text-sm">Failed to load alerts.</div>
             ) : alerts.length === 0 ? (
               <div className="text-center py-8 text-gray-500 text-sm border border-dashed border-gray-700 rounded-lg">
                 No alerts configured. Create one to get started.
@@ -425,7 +450,18 @@ export default function AlertsPanel({ isOpen, onClose, canManageAlerts = false }
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteMutation.mutate(alert.id)}
+                        onClick={() => {
+                          if (!canManageAlerts) return;
+                          void (async () => {
+                            try {
+                              await alertsClient.delete(alert.id);
+                              setAlerts((prev) => prev.filter((item) => item.id !== alert.id));
+                            } catch (err) {
+                              const message = err instanceof Error ? err.message : 'Unknown error';
+                              setError(message);
+                            }
+                          })();
+                        }}
                         disabled={!canManageAlerts}
                         className="h-8 w-8 p-0 text-gray-400 hover:text-red-400"
                       >
