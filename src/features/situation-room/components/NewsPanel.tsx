@@ -31,6 +31,7 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
   const normalizeThreatLevel = (value: unknown): ThreatLevel => {
     if (typeof value !== 'string') return 'low';
     const normalized = value.toLowerCase();
+    if (normalized === 'medium') return 'moderate';
     if (
       normalized === 'low' ||
       normalized === 'moderate' ||
@@ -84,7 +85,7 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
     const raw = item as Record<string, unknown>;
     const lat = toNumber(raw.lat ?? raw.latitude);
     const lng = toNumber(raw.lng ?? raw.longitude);
-    const threatLevel = normalizeThreatLevel(raw.threat_level ?? raw.threatLevel);
+    const threatLevel = normalizeThreatLevel(raw.threat_level ?? raw.threatLevel ?? raw.severity);
     const category = normalizeCategory(raw.category);
     const countries = Array.isArray(raw.countries)
       ? raw.countries.filter((value): value is string => typeof value === 'string')
@@ -113,8 +114,8 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData, isLoadin
       threat_level: threatLevel,
       region: regionLabel,
       country: countries[0],
-      lat: lat ?? 0,
-      lng: lng ?? 0,
+      lat: lat ?? Number.NaN,
+      lng: lng ?? Number.NaN,
       category: category,
       timestamp: typeof raw.timestamp === 'string' ? raw.timestamp : undefined,
     };

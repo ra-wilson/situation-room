@@ -62,6 +62,16 @@ AI Layer
 - OpenAI Responses API
 - Zod schema validation
 
+## Environment
+
+Prisma runtime connections should go through the Supabase pooler, while migrations should use the direct database host.
+
+Example:
+```env
+DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres"
+DIRECT_URL="postgresql://postgres:<password>@db.<ref>.supabase.co:5432/postgres"
+```
+
 ## Design Decisions
 
 - Grounded AI: summaries are generated only from ingested articles, not from open-ended “what’s happening today” prompts.
