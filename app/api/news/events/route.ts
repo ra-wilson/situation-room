@@ -59,7 +59,9 @@ export async function GET() {
     });
 
     return NextResponse.json(data, { headers: buildHeaders() });
-  } catch {
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[api/news/events] failed to load events", error);
     return NextResponse.json([], { headers: buildHeaders() });
   }
 }

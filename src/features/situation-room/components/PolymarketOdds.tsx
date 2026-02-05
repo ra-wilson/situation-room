@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useCallback } from 'react';
-import { TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { PredictionMarket } from '../domain/types';
 import { useSnapshotFetch } from '../hooks/useSnapshotFetch';
 import { useRenderGuard } from '../hooks/useRenderGuard';
@@ -73,6 +74,15 @@ export default function PolymarketOdds() {
             <BarChart3 className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-bold tracking-wider text-cyan-400">PREDICTION MARKETS</span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void fetchSnapshot()}
+            disabled={isLoading || tripped}
+            className="h-6 px-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/20"
+          >
+            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />

@@ -70,7 +70,9 @@ export async function GET() {
         headers: buildHeaders(payloadMeta),
       },
     );
-  } catch {
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[api/polymarket] failed to load snapshot", error);
     const meta: PolymarketResponseMeta = {
       status: "error",
       reason: "snapshot_fetch_failed",
