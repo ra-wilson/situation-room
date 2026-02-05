@@ -13,14 +13,14 @@ const DEFAULT_USER: User = {
 const isBrowser = () => typeof window !== "undefined";
 
 const loadUser = (): User | null => {
-  if (!isBrowser()) return DEFAULT_USER;
+  if (!isBrowser()) return null;
   const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-  if (!raw) return DEFAULT_USER;
+  if (!raw) return null;
   if (raw === LOGGED_OUT_SENTINEL) return null;
   try {
     return JSON.parse(raw) as User;
   } catch {
-    return DEFAULT_USER;
+    return null;
   }
 };
 

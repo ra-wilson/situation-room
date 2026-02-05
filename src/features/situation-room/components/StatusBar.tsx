@@ -13,11 +13,19 @@ import type { User as SituationUser } from '../domain/types';
 
 type StatusBarProps = {
   user: SituationUser | null;
+  canManageAlerts: boolean;
+  onLogin: () => void;
   onLogout: () => void;
   onShowAlerts: () => void;
 };
 
-export default function StatusBar({ user, onLogout, onShowAlerts }: StatusBarProps) {
+export default function StatusBar({
+  user,
+  canManageAlerts,
+  onLogin,
+  onLogout,
+  onShowAlerts
+}: StatusBarProps) {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -69,8 +77,9 @@ export default function StatusBar({ user, onLogout, onShowAlerts }: StatusBarPro
             <Button
               variant="ghost"
               size="sm"
-              onClick={onShowAlerts}
-              className="h-8 px-3 text-amber-400 hover:text-amber-300 hover:bg-amber-900/20 border border-amber-900/30"
+              onClick={canManageAlerts ? onShowAlerts : undefined}
+              disabled={!canManageAlerts}
+              className="h-8 px-3 text-amber-400 hover:text-amber-300 hover:bg-amber-900/20 border border-amber-900/30 disabled:opacity-40 disabled:hover:bg-transparent"
             >
               <Bell className="w-4 h-4 mr-2" />
               <span className="text-[10px] tracking-wider">ALERTS</span>
@@ -82,25 +91,34 @@ export default function StatusBar({ user, onLogout, onShowAlerts }: StatusBarPro
                 <Button variant="ghost" size="sm" className="h-8 px-3 text-cyan-400 hover:bg-cyan-900/20 border border-cyan-900/30">
                   <User className="w-4 h-4 mr-2" />
                   <span className="text-[10px] tracking-wider max-w-[100px] truncate">
-                    {user?.full_name || user?.email || 'OPERATOR'}
+                    {user?.full_name || user?.email || 'GUEST'}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-[#0a0a0a] border-cyan-900/30 text-white">
                 <div className="px-3 py-2">
-                  <p className="text-xs text-cyan-400 font-bold">{user?.full_name || 'Operator'}</p>
+                  <p className="text-xs text-cyan-400 font-bold">{user?.full_name || 'Guest'}</p>
                   <p className="text-[10px] text-gray-500">{user?.email}</p>
                 </div>
                 <DropdownMenuSeparator className="bg-cyan-900/30" />
-                <DropdownMenuItem onClick={onShowAlerts} className="text-xs cursor-pointer hover:bg-cyan-900/20">
-                  <Bell className="w-3 h-3 mr-2" />
-                  Manage Alerts
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-cyan-900/30" />
-                <DropdownMenuItem onClick={onLogout} className="text-xs text-red-400 cursor-pointer hover:bg-red-900/20">
-                  <LogOut className="w-3 h-3 mr-2" />
-                  Logout
-                </DropdownMenuItem>
+                {canManageAlerts ? (
+                  <>
+                    <DropdownMenuItem onClick={onShowAlerts} className="text-xs cursor-pointer hover:bg-cyan-900/20">
+                      <Bell className="w-3 h-3 mr-2" />
+                      Manage Alerts
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-cyan-900/30" />
+                    <DropdownMenuItem onClick={onLogout} className="text-xs text-red-400 cursor-pointer hover:bg-red-900/20">
+                      <LogOut className="w-3 h-3 mr-2" />
+                      Logout
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem onClick={onLogin} className="text-xs cursor-pointer hover:bg-cyan-900/20">
+                    <User className="w-3 h-3 mr-2" />
+                    Sign in to Alerts
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
