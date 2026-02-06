@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
-import { MapPin, Zap } from 'lucide-react';
+import { MapPin, Zap, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { NewsCategory, NewsItem, ThreatLevel } from '../domain/types';
 import { useRenderGuard } from '../hooks/useRenderGuard';
 
@@ -196,6 +197,15 @@ export default function NewsFeed({ onSelectNews, newsData, setNewsData }: NewsFe
             <Zap className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-bold tracking-wider text-cyan-400">INTELLIGENCE FEED</span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void fetchNews()}
+            disabled={isLoading || tripped}
+            className="h-6 px-2 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/20"
+          >
+            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
         <div className="flex items-center gap-2 mt-2">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />

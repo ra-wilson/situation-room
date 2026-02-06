@@ -28,6 +28,16 @@ type EventRecord = {
   updatedAt?: Date | null;
 };
 
+type GeoEventRecord = EventRecord & {
+  output?: { payload?: Prisma.JsonValue | null } | null;
+  geoPrecision?: "country" | "city" | "region" | "unknown" | null;
+  geoLabel?: string | null;
+};
+
+type LlmEventRecord = EventRecord & {
+  output?: { payload?: Prisma.JsonValue | null } | null;
+};
+
 type BasePrisma = Parameters<typeof ingestFeeds>[1] &
   Parameters<typeof upsertEventsFromArticles>[1] &
   Parameters<typeof assignGeoToEvents>[1] &
@@ -153,6 +163,48 @@ const fetchRecentEvents = async (
     },
   });
 
+const fetchRecentEventsForGeo = async (
+  prisma: PrismaLike,
+  since: Date,
+): Promise<GeoEventRecord[]> =>
+  prisma.event.findMany({
+    where: { updatedAt: { gte: since } },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      summary: true,
+      countries: true,
+      theatres: true,
+      lat: true,
+      lng: true,
+      updatedAt: true,
+      geoPrecision: true,
+      geoLabel: true,
+      output: { select: { payload: true } },
+    },
+  });
+
+const fetchRecentEventsForLlm = async (
+  prisma: PrismaLike,
+  since: Date,
+): Promise<LlmEventRecord[]> =>
+  prisma.event.findMany({
+    where: { updatedAt: { gte: since } },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      summary: true,
+      countries: true,
+      theatres: true,
+      lat: true,
+      lng: true,
+      updatedAt: true,
+      output: { select: { payload: true } },
+    },
+  });
+
 const fetchRelatedArticles = async (
   prisma: PrismaLike,
   event: EventRecord,
@@ -228,10 +280,7 @@ export const runNewsPipeline = async ({
   );
   const clusterTime = nowMs() - clusterStart;
 
-  const geoStart = nowMs();
   const recentEvents = await fetchRecentEvents(prisma, since);
-  const geoMetrics = await assignGeoToEvents(recentEvents, prisma);
-  const geoTime = nowMs() - geoStart;
 
   const llmStart = nowMs();
   let llmCalls = 0;
@@ -250,7 +299,15 @@ export const runNewsPipeline = async ({
     const llmWithTimeout: LlmClient = {
       complete: (prompt) => withTimeout(llm.complete(prompt), llmTimeoutMs),
     };
-    const eventsQueue = [...recentEvents];
+    const recentEventsForLlm = await fetchRecentEventsForLlm(prisma, since);
+    const withScores = recentEventsForLlm.map((event) => {
+      const payload = event.output?.payload as { location?: unknown } | null | undefined;
+      const location = typeof payload?.location === "string" ? payload.location.trim() : "";
+      const score = !event.output ? 2 : location.length === 0 ? 1 : 0;
+      return { event, score };
+    });
+    withScores.sort((a, b) => b.score - a.score);
+    const eventsQueue = withScores.map((item) => item.event);
     let nextIndex = 0;
     let remainingLlmCalls = maxLlmCalls;
 
@@ -310,13 +367,36 @@ export const runNewsPipeline = async ({
     };
 
     const workers = Array.from(
-      { length: Math.min(llmConcurrency, recentEvents.length) },
+      { length: Math.min(llmConcurrency, eventsQueue.length) },
       () => runWorker(),
     );
     await Promise.all(workers);
   }
 
   const llmTime = nowMs() - llmStart;
+
+  const geoStart = nowMs();
+  const eventsForGeo = await fetchRecentEventsForGeo(prisma, since);
+  const geoMetrics = await assignGeoToEvents(
+    eventsForGeo.map((event) => {
+      const payload = event.output?.payload as { location?: unknown } | null | undefined;
+      const geoHint = typeof payload?.location === "string" ? payload.location : null;
+      return {
+        id: event.id,
+        title: event.title,
+        summary: event.summary,
+        countries: event.countries,
+        theatres: event.theatres,
+        lat: event.lat,
+        lng: event.lng,
+        geoPrecision: event.geoPrecision ?? null,
+        geoLabel: event.geoLabel ?? null,
+        geoHint,
+      };
+    }),
+    prisma,
+  );
+  const geoTime = nowMs() - geoStart;
   const totalTime = nowMs() - totalStart;
 
   return {

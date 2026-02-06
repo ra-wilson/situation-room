@@ -40,7 +40,9 @@ export async function GET() {
         },
       },
     );
-  } catch {
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[api/markets] failed to load snapshot", error);
     return NextResponse.json({
       data: [],
       meta: {

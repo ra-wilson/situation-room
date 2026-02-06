@@ -18,6 +18,7 @@ export type SummaryPayload = {
   historicalContext: string;
   severity: "low" | "medium" | "high";
   sources: string[];
+  location: string | null;
 };
 
 export type SummariseResult = {
@@ -67,6 +68,16 @@ const summarySchema = z.object({
     z.enum(["low", "medium", "high"]),
   ),
   sources: z.array(z.string().trim().min(1)).min(1),
+  location: z
+    .preprocess(
+      (value) => {
+        if (typeof value !== "string") return value;
+        const normalized = value.trim();
+        return normalized.length > 0 ? normalized : null;
+      },
+      z.union([z.string().trim().min(1), z.null()]),
+    )
+    .optional(),
 });
 
 const toIsoString = (value: Date | string | null | undefined): string | null => {
@@ -135,7 +146,7 @@ const buildPrompt = (
   return [
     "You are an analyst summarizing geopolitical events for non-experts.",
     "You must return ONLY valid JSON matching this schema:",
-    '{ "summary": "string", "historicalContext": "string", "severity": "low | medium | high", "sources": ["string"] }',
+    '{ "summary": "string", "historicalContext": "string", "severity": "low | medium | high", "sources": ["string"], "location": "string | null" }',
     "Do not include markdown, explanation, or prose. Output JSON only.",
     "summary: 4-6 sentences, neutral, plain language.",
     "historicalContext: bulleted timeline of related historical events, 200-350 words max.",
@@ -145,6 +156,9 @@ const buildPrompt = (
     "- medium: meaningful escalation, significant military moves, new sanctions, or sustained clashes.",
     "- high: major attacks, invasion, war declaration, nuclear escalation, regime change/coup, or imminent large-scale conflict.",
     "sources: array of URL strings; only URLs from the provided articles; do not invent any sources.",
+    "location: infer the most specific real-world location mentioned (city, state/province, region, or country).",
+    "If multiple locations are mentioned, choose the primary one for the event.",
+    "If no location is inferable, return null.",
     `Event context title: ${event.title ?? "(none)"}`,
     "",
     "Articles:",
@@ -225,16 +239,28 @@ export const summariseEvent = async (
     const parsedExisting = existingPayload
       ? summarySchema.safeParse(existingPayload)
       : null;
-    if (parsedExisting?.success) {
+    if (parsedExisting?.success && parsedExisting.data.location != null) {
+      const payload: SummaryPayload = {
+        ...parsedExisting.data,
+        location: parsedExisting.data.location ?? null,
+      };
       console.info("summariseEvent status", {
         status: "skipped",
         eventId: event.id,
         inputHash,
       });
+      await prisma.event.update({
+        where: { id: event.id },
+        data: {
+          summary: parsedExisting.data.summary,
+          severity: parsedExisting.data.severity,
+          lastSeenAt: new Date(),
+        },
+      });
       return {
         skipped: true,
         inputHash,
-        payload: parsedExisting.data,
+        payload,
         status: "skipped",
       };
     }
@@ -303,6 +329,7 @@ export const summariseEvent = async (
       parsedResult.data.summary,
     ),
     sources,
+    location: parsedResult.data.location ?? null,
   };
 
   await prisma.eventOutput.upsert({
