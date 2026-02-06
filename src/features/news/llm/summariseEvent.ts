@@ -240,6 +240,10 @@ export const summariseEvent = async (
       ? summarySchema.safeParse(existingPayload)
       : null;
     if (parsedExisting?.success && parsedExisting.data.location != null) {
+      const payload: SummaryPayload = {
+        ...parsedExisting.data,
+        location: parsedExisting.data.location ?? null,
+      };
       console.info("summariseEvent status", {
         status: "skipped",
         eventId: event.id,
@@ -256,7 +260,7 @@ export const summariseEvent = async (
       return {
         skipped: true,
         inputHash,
-        payload: parsedExisting.data,
+        payload,
         status: "skipped",
       };
     }
