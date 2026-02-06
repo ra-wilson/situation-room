@@ -6,6 +6,9 @@ type EventInput = {
   theatres?: string[] | null;
   title?: string | null;
   summary?: string | null;
+  geoHint?: string | null;
+  geoPrecision?: "country" | "city" | "region" | "unknown" | null;
+  geoLabel?: string | null;
 };
 
 export type GeoMetrics = {
@@ -38,31 +41,13 @@ type PrismaLike = {
   };
 };
 
-const COUNTRY_CAPITAL_COORDS: Record<
-  string,
-  { capital: string; lat: number; lng: number }
-> = {
-  "United States": { capital: "Washington, D.C.", lat: 38.9072, lng: -77.0369 },
-  "United Kingdom": { capital: "London", lat: 51.5074, lng: -0.1278 },
-  Russia: { capital: "Moscow", lat: 55.7558, lng: 37.6173 },
-  Ukraine: { capital: "Kyiv", lat: 50.4501, lng: 30.5234 },
-  China: { capital: "Beijing", lat: 39.9042, lng: 116.4074 },
-  Taiwan: { capital: "Taipei", lat: 25.033, lng: 121.5654 },
-  Israel: { capital: "Jerusalem", lat: 31.7683, lng: 35.2137 },
-  Iran: { capital: "Tehran", lat: 35.6892, lng: 51.389 },
-  "North Korea": { capital: "Pyongyang", lat: 39.0392, lng: 125.7625 },
-  "South Korea": { capital: "Seoul", lat: 37.5665, lng: 126.978 },
-  India: { capital: "New Delhi", lat: 28.6139, lng: 77.209 },
-  Pakistan: { capital: "Islamabad", lat: 33.6844, lng: 73.0479 },
-  Turkey: { capital: "Ankara", lat: 39.9334, lng: 32.8597 },
-};
-
 const DEFAULT_CAPITAL = {
   capital: "Washington, D.C.",
   country: "United States",
   lat: 38.9072,
   lng: -77.0369,
 };
+const DEFAULT_GEO_LABEL = `${DEFAULT_CAPITAL.capital}, ${DEFAULT_CAPITAL.country}`.toLowerCase();
 
 const NOMINATIM_ENDPOINT = "https://nominatim.openstreetmap.org/search";
 const NOMINATIM_USER_AGENT =
@@ -163,47 +148,13 @@ const geocode = async (
   }
 };
 
-const HOTSPOT_QUERIES: Array<{
-  keyword: string;
-  query: string;
-  precision: "city" | "region" | "country";
-}> = [
-  { keyword: "gaza", query: "Gaza", precision: "region" },
-  { keyword: "west bank", query: "West Bank", precision: "region" },
-  { keyword: "donbas", query: "Donbas", precision: "region" },
-  { keyword: "crimea", query: "Crimea", precision: "region" },
-  { keyword: "south china sea", query: "South China Sea", precision: "region" },
-  { keyword: "red sea", query: "Red Sea", precision: "region" },
-  { keyword: "kashmir", query: "Kashmir", precision: "region" },
-  { keyword: "taiwan", query: "Taiwan", precision: "country" },
-  { keyword: "iran", query: "Iran", precision: "country" },
-  { keyword: "israel", query: "Israel", precision: "country" },
-  { keyword: "ukraine", query: "Ukraine", precision: "country" },
-  { keyword: "russia", query: "Russia", precision: "country" },
-  { keyword: "lebanon", query: "Lebanon", precision: "country" },
-  { keyword: "syria", query: "Syria", precision: "country" },
-  { keyword: "yemen", query: "Yemen", precision: "country" },
-  { keyword: "taipei", query: "Taipei, Taiwan", precision: "city" },
-  { keyword: "beijing", query: "Beijing, China", precision: "city" },
-  { keyword: "seoul", query: "Seoul, South Korea", precision: "city" },
-  { keyword: "pyongyang", query: "Pyongyang, North Korea", precision: "city" },
-];
-
 const inferGeoQuery = (
   event: EventInput,
-): { query: string; precision: "city" | "region" | "country" } | null => {
-  const theatre = event.theatres?.[0]?.trim();
-  if (theatre) {
-    return { query: theatre, precision: "region" };
+): { query: string; precision: "city" | "region" | "country" | "unknown" } | null => {
+  const hint = event.geoHint?.trim();
+  if (hint) {
+    return { query: hint, precision: "unknown" };
   }
-
-  const text = `${event.title ?? ""} ${event.summary ?? ""}`.toLowerCase();
-  for (const entry of HOTSPOT_QUERIES) {
-    if (text.includes(entry.keyword)) {
-      return { query: entry.query, precision: entry.precision };
-    }
-  }
-
   return null;
 };
 
@@ -215,8 +166,14 @@ export const assignGeoToEvents = async (
 
   for (const event of events) {
     if (event.lat != null && event.lng != null) {
-      metrics.skipped += 1;
-      continue;
+      const hasHint = Boolean(event.geoHint?.trim());
+      const precision = event.geoPrecision ?? null;
+      const label = event.geoLabel?.trim().toLowerCase();
+      const isDefaultLabel = label ? label === DEFAULT_GEO_LABEL : false;
+      if (!hasHint || (precision && precision !== "unknown" && !isDefaultLabel)) {
+        metrics.skipped += 1;
+        continue;
+      }
     }
 
     const inferred = inferGeoQuery(event);
@@ -245,17 +202,25 @@ export const assignGeoToEvents = async (
     }
 
     if (lat == null || lng == null) {
-      const primaryCountry = event.countries?.[0];
-      const capital = primaryCountry
-        ? COUNTRY_CAPITAL_COORDS[primaryCountry]
-        : undefined;
-      const resolved = capital ?? DEFAULT_CAPITAL;
-      lat = resolved.lat;
-      lng = resolved.lng;
-      geoLabel = capital
-        ? `${resolved.capital}, ${primaryCountry}`
-        : `${resolved.capital}, ${DEFAULT_CAPITAL.country}`;
-      geoPrecision = primaryCountry ? "country" : "unknown";
+      const primaryCountry = event.countries?.[0]?.trim();
+      if (primaryCountry) {
+        const capitalQuery = `${primaryCountry} capital`;
+        const geocoded = await geocode(prisma, capitalQuery);
+        if (geocoded) {
+          lat = geocoded.lat;
+          lng = geocoded.lng;
+          geoLabel = geocoded.label;
+          geoPrecision = "country";
+          inferredQuery = capitalQuery;
+        }
+      }
+    }
+
+    if (lat == null || lng == null) {
+      lat = DEFAULT_CAPITAL.lat;
+      lng = DEFAULT_CAPITAL.lng;
+      geoLabel = `${DEFAULT_CAPITAL.capital}, ${DEFAULT_CAPITAL.country}`;
+      geoPrecision = "unknown";
     }
 
     const resolvedLat = lat ?? DEFAULT_CAPITAL.lat;

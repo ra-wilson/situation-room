@@ -40,6 +40,7 @@ export async function GET() {
             summary?: string;
             historicalContext?: string;
             sources?: string[];
+            severity?: string;
           }
         | undefined;
 
@@ -48,7 +49,9 @@ export async function GET() {
         title: event.title ?? null,
         summary: output?.summary ?? null,
         historicalContext: output?.historicalContext ?? null,
-        severity: (event as { severity?: string | null }).severity ?? null,
+        severity:
+          (event as { severity?: string | null }).severity ??
+          (output?.severity ?? null),
         countries: toArray((event as { countries?: string[] | null }).countries),
         theatres: toArray((event as { theatres?: string[] | null }).theatres),
         lat: (event as { lat?: number | null }).lat ?? null,

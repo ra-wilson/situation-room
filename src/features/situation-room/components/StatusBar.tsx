@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Shield, Wifi, Activity, Bell, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -26,6 +26,17 @@ export default function StatusBar({
   onLogout,
   onShowAlerts
 }: StatusBarProps) {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatTime = (date: Date) => {
+    return date.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+  };
+
   return (
     <div className="fixed top-0 left-0 right-0 z-40 bg-gradient-to-b from-[#0a0a0a] via-[#0a0a0a] to-transparent">
       <div className="border-b border-cyan-900/30 bg-[#0a0a0a]/90 backdrop-blur-sm">
@@ -114,8 +125,7 @@ export default function StatusBar({
             {/* Time */}
             <div className="hidden lg:block text-right">
               <div className="text-cyan-300 text-sm font-bold tracking-wider">
-                {/* Intentionally static: avoid time-driven re-renders in the UI. */}
-                UTC
+                {formatTime(time)}
               </div>
             </div>
           </div>
