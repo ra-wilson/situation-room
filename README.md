@@ -4,6 +4,8 @@ A geopolitical intelligence dashboard that ingests live news feeds, clusters rel
 
 Built as a product experiment to explore how raw news can be transformed into clear, decision-ready insights for non-experts.
 
+MVP: https://situation-room-eight.vercel.app/
+
 ## Purpose
 
 News is fragmented and noisy. This project answers:
