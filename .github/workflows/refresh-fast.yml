@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Call markets refresh
         env:
-          BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
@@ -39,7 +39,7 @@ jobs:
     steps:
       - name: Call polymarket refresh
         env:
-          BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
