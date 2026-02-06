@@ -78,37 +78,37 @@ This project is intentionally scoped as a cost-aware MVP. All data sources and r
 
 With additional budget or a paid tier, the system could be extended in the following ways:
 
-Live and High-Frequency Data
-	•	Replace snapshot-based market polling with streaming or near-real-time feeds:
-	•	WebSockets for markets and prediction platforms
-	•	Sub-minute refresh intervals for volatile events
-	•	Support adaptive refresh rates, prioritising regions or assets experiencing rapid change.
+## Live and High-Frequency Data
+Replace snapshot-based market polling with streaming or near-real-time feeds:
+- WebSockets for markets and prediction platforms
+- Sub-minute refresh intervals for volatile events
+- Support adaptive refresh rates, prioritising regions or assets experiencing rapid change.
 
-Broader OSINT Coverage
-	•	Ingest additional open-source intelligence feeds such as:
-	•	Think tanks, policy institutes, and government briefings
-	•	Conflict trackers and humanitarian organisations
-	•	Curated regional news and local-language sources
-	•	Apply source weighting and credibility scoring to distinguish signal from noise.
+## Broader OSINT Coverage
+Ingest additional open-source intelligence feeds such as:
+- Think tanks, policy institutes, and government briefings
+- Conflict trackers and humanitarian organisations
+- Curated regional news and local-language sources
+- Apply source weighting and credibility scoring to distinguish signal from noise.
 
-Public Sentiment and Narrative Analysis
-	•	Integrate social-platform data (e.g. X / Grok APIs) to analyse:
-	•	Public reaction to geopolitical events
-	•	Narrative spread and sentiment shifts over time
-	•	Early signals of escalation before they appear in mainstream reporting
-	•	Aggregate sentiment at the event or region level, rather than raw post streams, to maintain clarity and avoid information overload.
+## Public Sentiment and Narrative Analysis
+Integrate social-platform data (e.g. X / Grok APIs) to analyse:
+- Public reaction to geopolitical events
+- Narrative spread and sentiment shifts over time
+- Early signals of escalation before they appear in mainstream reporting
+- Aggregate sentiment at the event or region level, rather than raw post streams, to maintain clarity and avoid information overload.
 
-Deeper AI Analysis
-	•	Move beyond summarisation to:
-	•	Narrative clustering (how different groups frame the same event)
-	•	Contradiction and bias detection across sources
-	•	Time-series analysis of escalation, de-escalation, and market impact
-	•	Introduce explainable AI outputs, showing why an event is classified as high or medium severity.
+## Deeper AI Analysis
+Move beyond summarisation to:
+- Narrative clustering (how different groups frame the same event)
+- Contradiction and bias detection across sources
+- Time-series analysis of escalation, de-escalation, and market impact
+- Introduce explainable AI outputs, showing why an event is classified as high or medium severity.
 
-User-Facing Product Extensions
-	•	Personalised alerts based on regions, asset classes, or themes
-	•	Paid tiers for:
-	•	Faster refresh rates
-	•	Historical backfills
-	•	Advanced sentiment and risk analysis
-	•	Exportable data for analysts, researchers, or journalists.
+## User-Facing Product Extensions
+Personalised alerts based on regions, asset classes, or themes
+Paid tiers for:
+- Faster refresh rates
+- Historical backfills
+- Advanced sentiment and risk analysis
+- Exportable data for analysts, researchers, or journalists.
