@@ -86,7 +86,7 @@ export default function PolymarketOdds() {
         </div>
         <div className="flex items-center gap-2 mt-2">
           <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-          <span className="text-[10px] text-gray-500 tracking-wider">AI ESTIMATED ODDS</span>
+          <span className="text-[10px] text-gray-500 tracking-wider">POLYMARKET ODDS</span>
         </div>
       </div>
 
