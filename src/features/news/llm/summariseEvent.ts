@@ -125,6 +125,34 @@ const summarizeZodError = (error: z.ZodError): string =>
 const truncateText = (value: string, max = 300): string =>
   value.length > max ? `${value.slice(0, max - 3)}...` : value;
 
+const normalizeSourceUrl = (value: string): string => {
+  const raw = value.trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    parsed.hash = "";
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (
+        key.toLowerCase().startsWith("utm_") ||
+        key.toLowerCase() === "gclid" ||
+        key.toLowerCase() === "fbclid"
+      ) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    const pathname =
+      parsed.pathname.length > 1
+        ? parsed.pathname.replace(/\/+$/, "")
+        : parsed.pathname;
+    parsed.pathname = pathname || "/";
+    const query = parsed.searchParams.toString();
+    const querySuffix = query ? `?${query}` : "";
+    return `${parsed.protocol}//${parsed.host}${parsed.pathname}${querySuffix}`;
+  } catch {
+    return raw;
+  }
+};
+
 const buildPrompt = (
   event: EventInput,
   articles: RawArticleInput[],
@@ -296,16 +324,27 @@ export const summariseEvent = async (
     return { skipped: false, inputHash, payload: null, status: "parsed_failed" };
   }
 
-  const allowedUrls = new Set(
+  const allowedRawUrls = new Set(
     articles.map((article) => article.url?.trim()).filter(Boolean) as string[],
   );
+  const allowedNormalizedToRaw = new Map<string, string>();
+  for (const allowed of allowedRawUrls) {
+    const normalized = normalizeSourceUrl(allowed);
+    if (normalized && !allowedNormalizedToRaw.has(normalized)) {
+      allowedNormalizedToRaw.set(normalized, allowed);
+    }
+  }
   const sources: string[] = [];
   const seen = new Set<string>();
   for (const source of parsedResult.data.sources) {
-    const url = source.trim();
-    if (!allowedUrls.has(url) || seen.has(url)) continue;
-    seen.add(url);
-    sources.push(url);
+    const rawSource = source.trim();
+    const normalizedSource = normalizeSourceUrl(rawSource);
+    const matchedSource = allowedRawUrls.has(rawSource)
+      ? rawSource
+      : allowedNormalizedToRaw.get(normalizedSource);
+    if (!matchedSource || seen.has(matchedSource)) continue;
+    seen.add(matchedSource);
+    sources.push(matchedSource);
   }
 
   if (sources.length === 0) {

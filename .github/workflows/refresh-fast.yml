@@ -19,8 +19,10 @@ jobs:
         env:
           BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
           set -euo pipefail
+          : "${FINNHUB_API_KEY:?Missing FINNHUB_API_KEY secret}"
           url="${BASE_URL}/api/markets/refresh"
           tmp=$(mktemp)
           code=$(curl -sS -w "%{http_code}" -o "$tmp" --retry 3 --retry-delay 5 \

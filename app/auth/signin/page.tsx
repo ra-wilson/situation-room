@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { signIn, getProviders } from "next-auth/react";
 import type { ClientSafeProvider } from "next-auth/react";
+import Link from "next/link";
 import { Shield, User, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,7 +108,10 @@ export default function SignInPage() {
                 {oauthProviders.map((provider) => (
                   <Button
                     key={provider.id}
-                    onClick={() => signIn(provider.id, { callbackUrl: "/" })}
+                    type="button"
+                    onClick={() =>
+                      void signIn(provider.id, { callbackUrl: "/", redirect: true })
+                    }
                     className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3"
                   >
                     <User className="w-4 h-4 mr-2" />
@@ -144,12 +148,12 @@ export default function SignInPage() {
             )}
 
             <div className="mt-6 text-center">
-              <a
+              <Link
                 href="/"
                 className="text-[10px] text-cyan-500 hover:text-cyan-300 tracking-widest"
               >
                 RETURN TO SITUATION MONITOR
-              </a>
+              </Link>
             </div>
           </div>
 

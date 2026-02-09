@@ -12,7 +12,7 @@ export default function AuthButton() {
     if (isAuthenticated) {
       void signOut();
     } else {
-      void signIn();
+      void signIn("google", { callbackUrl: "/" });
     }
   };
 

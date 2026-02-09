@@ -59,7 +59,7 @@ export default function SituationMonitor() {
       setIsAuthenticated(true);
       return;
     }
-    await signIn();
+    await signIn('google', { callbackUrl: '/' });
   };
 
   const handleLogout = async () => {

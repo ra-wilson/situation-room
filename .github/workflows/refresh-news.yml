@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Call news pipeline
         env:
-          BASE_URL: ${{ secrets.CRON_BASE_URL }}
+          BASE_URL: ${{ secrets.BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -euo pipefail
