@@ -22,7 +22,7 @@ jobs:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: |
           set -euo pipefail
-          : "${FINNHUB_API_KEY:?Missing FINNHUB_API_KEY secret}"
+          : "${FINNHUB_API_KEY}"
           url="${BASE_URL}/api/markets/refresh"
           tmp=$(mktemp)
           code=$(curl -sS -w "%{http_code}" -o "$tmp" --retry 3 --retry-delay 5 \
